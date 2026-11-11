@@ -1,0 +1,443 @@
+# PROMPT 2: VALIDACIÓN DE ESTRUCTURA Y GENERACIÓN DE MÓDULOS DE BACKEND (CLEAN ARCHITECTURE)
+## Proyecto: Plataforma de Finanzas Personales (TusFinanzas)
+## Alcance: ingresos netos, gastos obligatorios, deudas, gastos hormiga y capacidad de ahorro
+
+==============================================================================
+PARTE 1: VALIDACIÓN DE ESTRUCTURA Y DISEÑO ARQUITECTÓNICO
+==============================================================================
+
+Actúa como un Arquitecto de Software Senior especializado en:
+* Sistemas Full Stack empresariales.
+* Clean Architecture (Robert C. Martin).
+* FastAPI + React con TypeScript.
+* PostgreSQL 18, SQLAlchemy 2.0 y Pydantic v2.
+* Seguridad OWASP Top 10 y protección de información financiera personal.
+* Calidad de Software ISO/IEC 25010.
+* Modelado de dominios y cálculos monetarios precisos.
+
+Tu tarea es VALIDAR la estructura actual de carpetas y archivos del proyecto "TusFinanzas" contra los criterios funcionales, arquitectónicos, financieros y de seguridad definidos en este documento y en el Prompt 01 de TusFinanzas.
+
+1. CONTEXTO DEL SISTEMA
+
+TusFinanzas es una aplicación de finanzas personales que permite a cada usuario:
+* Registrar sus datos de perfil y configurar una moneda principal mediante código ISO 4217.
+* Registrar fuentes de ingreso y sus respectivas periodicidades.
+* Registrar los ingresos efectivamente recibidos y las deducciones aplicadas a cada ingreso.
+* Calcular el ingreso neto recibido y consultar el total mensual, distinguiendo datos reales de estimaciones.
+* Registrar, categorizar y consultar gastos obligatorios, necesarios variables y discrecionales.
+* Controlar gastos fijos, variables, ocasionales, recurrentes, pagados, pendientes y vencidos.
+* Registrar deudas, saldos pendientes y pagos asociados.
+* Identificar patrones de gastos pequeños, frecuentes o repetitivos que podrían representar gastos hormiga.
+* Consultar balances mensuales y estimaciones de capacidad de ahorro con fórmulas y datos de origen explicables.
+* Mantener privados sus ingresos, gastos, deudas y análisis financieros.
+
+La plataforma es una herramienta de registro, organización y análisis descriptivo. No debe presentarse como asesor financiero profesional ni emitir recomendaciones de inversión, tributarias o crediticias personalizadas.
+
+2. ARQUITECTURA OBJETIVO
+
+El sistema debe cumplir una arquitectura por capas estricta:
+
+Frontend (React + TypeScript)
+    -> API / Controllers (FastAPI)
+        -> Service Layer (casos de uso y reglas de negocio financiero)
+            -> Persistence Layer (SQLAlchemy 2.0 + PostgreSQL 18)
+
+Cada capa debe:
+* Tener responsabilidades claras y respetar Separation of Concerns (SoC).
+* No invadir las responsabilidades de las demás capas.
+* Cumplir el principio de responsabilidad única (SRP).
+* Mantener dependencias controladas y evitar acoplamiento innecesario.
+* Garantizar que los cálculos financieros no estén implementados directamente en componentes React ni en rutas HTTP.
+* Mantener la lógica de negocio crítica en el backend; el frontend puede presentar resultados, pero no constituye la fuente de verdad de los cálculos.
+
+3. ESTRUCTURA ESPERADA - BACKEND
+
+Validar la estructura del backend con base en el siguiente objetivo:
+
+```text
+backend/
+ ├── app/
+ │   ├── auth/                  # Autenticación JWT, refresh tokens y sesiones seguras
+ │   ├── users/                 # Usuarios, perfiles, roles y propiedad de los datos
+ │   ├── incomes/               # Fuentes de ingreso, ingresos recibidos y deducciones
+ │   ├── expenses/              # Gastos, categorías y clasificación financiera
+ │   ├── debts/                 # Deudas, saldos y pagos asociados
+ │   ├── financial_analysis/    # Balance mensual, ingreso neto y patrones de gasto
+ │   ├── core/                  # Configuración, SQLAlchemy, seguridad y excepciones
+ │   └── main.py                # Punto de entrada FastAPI y registro de routers
+ ├── requirements.txt
+ ├── .env.example
+ └── READMEv2.md
+```
+
+Cada módulo debe mantener separación entre modelos, esquemas, servicios y rutas cuando corresponda. El módulo `financial_analysis` podrá omitir modelos ORM propios si sus resultados se calculan mediante consultas y agregaciones sobre las entidades existentes y no necesita persistir nuevos datos. No crear tablas o modelos artificiales solo para completar una plantilla.
+
+4. ESTRUCTURA ESPERADA - FRONTEND
+
+Validar una organización equivalente a la siguiente, adaptándola a la estructura real existente cuando sea razonable:
+
+```text
+frontend/
+ ├── src/
+ │   ├── api/                  # Cliente HTTP, configuración e interceptores
+ │   ├── auth/                 # Autenticación, sesión y rutas protegidas
+ │   ├── components/           # Componentes UI reutilizables
+ │   ├── pages/                # Vistas por caso de uso
+ │   │   ├── dashboard/        # Resumen financiero
+ │   │   ├── incomes/          # Fuentes, ingresos recibidos y deducciones
+ │   │   ├── expenses/         # Registro y clasificación de gastos
+ │   │   ├── debts/            # Deudas y pagos
+ │   │   └── analysis/         # Balance mensual y gastos hormiga potenciales
+ │   ├── layouts/              # Layouts de autenticación y aplicación
+ │   ├── hooks/                # useAuth, useIncomes, useExpenses, useDebts, etc.
+ │   ├── context/              # Estado global de sesión y preferencias
+ │   ├── services/             # Consumo de API y coordinación frontend
+ │   ├── routes/               # Rutas públicas y privadas
+ │   ├── utils/                # Formato de moneda, fechas y validaciones de UI
+ │   ├── styles/               # Estilos globales
+ │   └── main.tsx
+ └── package.json
+```
+
+Criterios específicos del frontend:
+* Utilizar la moneda preferida del usuario para mostrar importes, sin cambiar el valor almacenado en el backend.
+* No utilizar operaciones de punto flotante de JavaScript para recalcular totales financieros oficiales. Presentar los valores calculados por el backend o utilizar una estrategia decimal segura para operaciones auxiliares.
+* Diferenciar visualmente ingresos recibidos y estimados, gastos pagados y pendientes, así como balances reales y proyectados.
+* No presentar una sugerencia de gasto hormiga como una clasificación definitiva hasta que el usuario la confirme.
+* No almacenar JWT en `localStorage` cuando se utilice un esquema de autenticación mediante cookies HttpOnly.
+* No incluir información financiera privada en logs del navegador, analítica de terceros ni mensajes de error.
+
+5. MODELO ER DE REFERENCIA (3FN - 9 ENTIDADES)
+
+Valida que la estructura del backend permita implementar correctamente el modelo relacional inicial normalizado en tercera forma normal (3FN) para la base de datos `tusfinanzas_db`, definido en el Prompt 01:
+
+1. `USUARIOS`
+2. `ROLES`
+3. `USUARIO_ROLES`
+4. `FUENTES_INGRESO`
+5. `INGRESOS`
+6. `DEDUCCIONES_INGRESO`
+7. `CATEGORIAS_GASTO`
+8. `DEUDAS`
+9. `GASTOS`
+
+Relaciones y cardinalidades esperadas:
+* Usuario ↔ Rol (N:M a través de `USUARIO_ROLES`).
+* Usuario → Fuentes de ingreso (1:N).
+* Fuente de ingreso → Ingresos recibidos (1:N).
+* Ingreso → Deducciones de ingreso (1:N).
+* Usuario → Categorías de gasto personalizadas (1:N); también existen categorías globales del sistema.
+* Usuario → Deudas (1:N).
+* Usuario → Gastos (1:N).
+* Categoría de gasto → Gastos (1:N).
+* Deuda → Gastos asociados a pagos de esa deuda (1:N).
+
+La validación debe comprobar, como mínimo:
+* Que cada ingreso pertenezca a una fuente de ingreso del mismo usuario.
+* Que cada deducción pertenezca a un ingreso cuyo propietario sea el usuario autenticado.
+* Que cada gasto pertenezca al usuario autenticado y utilice una categoría global o una categoría privada de ese mismo usuario.
+* Que una deuda asociada a un gasto pertenezca al mismo usuario que registra el pago.
+* Que las relaciones no permitan consultar, modificar o eliminar datos de otra cuenta.
+* Que no existan duplicaciones innecesarias de importes derivados, como totales mensuales que puedan calcularse desde los movimientos.
+
+Si el repositorio contiene un esquema SQL diferente, inspeccionarlo antes de proponer cambios. No reemplazar tablas existentes ni inventar columnas sin analizar primero el modelo real.
+
+6. SEGURIDAD Y NORMAS
+
+Valida el cumplimiento de:
+* OWASP Top 10, especialmente A01 (Broken Access Control), A02 (Cryptographic Failures), A03 (Injection) y A05 (Security Misconfiguration).
+* No guardar tokens JWT en `localStorage` cuando se utilicen cookies HttpOnly; definir protección CSRF según el flujo de autenticación elegido.
+* Validación estricta de entradas con Pydantic v2.
+* Consultas parametrizadas mediante SQLAlchemy 2.0; prohibido concatenar entradas del usuario para construir SQL.
+* Manejo centralizado de excepciones en FastAPI.
+* Principio de mínimo privilegio y verificación de Ownership para cada recurso financiero.
+* Hash seguro de contraseñas con una dependencia mantenida y compatible.
+* Protección de datos sensibles en logs, respuestas API, copias de seguridad y herramientas de monitoreo.
+* Uso de HTTPS y configuración restrictiva de CORS en producción.
+* Uso de `Decimal` en Python y `NUMERIC`/`DECIMAL` en PostgreSQL para todos los importes monetarios. No utilizar `FLOAT` ni `DOUBLE` para representar dinero.
+* Validación de moneda por usuario y prohibición de sumar importes de monedas distintas sin una conversión cambiaria explícita y documentada.
+
+7. CRITERIOS DE EVALUACIÓN
+
+Evalúa la estructura actual del proyecto y responde:
+1. ¿La estructura de carpetas cumple Clean Architecture y separación de responsabilidades?
+2. ¿Hay mezcla indebida de responsabilidades entre rutas, servicios, modelos y acceso a la base de datos?
+3. ¿Los dominios de usuarios, ingresos, gastos, deudas y análisis financiero están correctamente separados?
+4. ¿El modelo de datos soporta las relaciones del negocio sin duplicar información derivada?
+5. ¿La estructura soporta escalabilidad, mantenibilidad y calidad conforme a ISO/IEC 25010?
+6. ¿Se aplican correctamente la privacidad por usuario, RBAC y Ownership?
+7. ¿Se protege la precisión de los importes y la consistencia de los cálculos financieros?
+8. ¿Se distinguen los ingresos efectivamente recibidos de los ingresos estimados?
+9. ¿Se distinguen los gastos pagados de los pendientes y vencidos?
+10. ¿La detección de gastos hormiga se implementa como sugerencia verificable y no como una conclusión automática absoluta?
+11. ¿Qué carpetas, archivos o responsabilidades sobran o faltan en backend y frontend?
+12. ¿Qué refactorizaciones estructurales recomiendas y en qué orden deberían realizarse?
+
+8. FORMATO DE RESPUESTA
+
+Entrega el resultado en este formato:
+* ✔ Cumplimientos correctos.
+* ⚠️ Problemas detectados.
+* ❌ Violaciones graves de arquitectura, seguridad o integridad financiera.
+* 🔧 Recomendaciones concretas y accionables.
+* 🧭 Plan de refactorización priorizado, indicando archivos y dependencias afectadas.
+
+No declares que una funcionalidad existe únicamente porque aparece en la estructura de carpetas. Sustenta cada hallazgo en archivos o código inspeccionado. Cuando no haya evidencia suficiente, indícalo expresamente.
+
+==============================================================================
+PARTE 2: GUÍA DE IMPLEMENTACIÓN DE MÓDULOS POR DOMINIO (CODE GENERATION)
+==============================================================================
+
+Actúa como Arquitecto de Software y Backend Senior especializado en:
+* Python 3.11+ / 3.12.
+* FastAPI.
+* SQLAlchemy 2.0 (ORM).
+* Pydantic v2.
+* Clean Architecture y principios SOLID.
+* PostgreSQL 18 (`tusfinanzas_db`).
+* Seguridad OWASP y privacidad de información financiera personal.
+* Aritmética decimal y modelado de movimientos monetarios.
+
+Tu tarea es GENERAR O COMPLETAR LOS MODELOS DE DATOS, ESQUEMAS, SERVICIOS Y ENDPOINTS para cada dominio de TusFinanzas. Debes seguir una estructura profesional consistente con el Prompt 01. Antes de modificar archivos existentes, inspecciona su contenido y conserva las decisiones compatibles con los requisitos.
+
+Estructura estándar de un módulo con entidades persistentes:
+
+```text
+incomes/
+ ├── models.py     # ORM: fuentes de ingreso, ingresos y deducciones
+ ├── schemas.py    # Pydantic v2: Create, Update y Response
+ ├── services.py   # Reglas de negocio y operaciones transaccionales
+ └── routes.py     # Endpoints RESTful de FastAPI
+```
+
+Dominios que deben implementarse:
+* `auth`: registro, login, refresh, logout y usuario autenticado.
+* `users`: perfil, preferencias, moneda principal, estado y roles.
+* `incomes`: fuentes de ingreso, ingresos recibidos, deducciones y cálculos de ingreso neto.
+* `expenses`: categorías, gastos, recurrencia, estado de pago y clasificación financiera.
+* `debts`: deudas, saldos pendientes y asociación con pagos registrados.
+* `financial_analysis`: agregaciones mensuales, balance real/proyectado, capacidad de ahorro y detección explicable de posibles gastos hormiga.
+
+1. REGLAS OBLIGATORIAS
+
+* Aplica SRP: cada archivo y componente debe tener una responsabilidad definida.
+* Aplica DRY: no duplicar validaciones o cálculos financieros en rutas, servicios o frontend.
+* Usa tipado explícito (`Type Hints`) en todo el código Python.
+* Incluye docstrings en español siguiendo PEP 257.
+* No mezclar lógica de negocio en `routes.py`.
+* No acceder directamente a la base de datos desde `routes.py`; las rutas deben delegar en servicios o casos de uso.
+* Utilizar Pydantic v2 para validar y serializar datos de entrada y salida.
+* Utilizar inyección explícita de dependencias de FastAPI mediante `Depends`.
+* Mantener la lógica financiera en servicios de dominio o componentes especializados, sin depender de objetos HTTP.
+* Gestionar las transacciones de manera explícita y consistente. Ante un error, revertir la operación completa.
+* No confiar en `usuario_id`, `propietario_id` ni roles recibidos desde el frontend. Obtener el usuario desde la autenticación validada.
+* No cambiar automáticamente la clasificación elegida por el usuario, excepto cuando una regla de negocio explícita lo autorice y quede documentada.
+* No generar recomendaciones de inversión, evasión tributaria, endeudamiento o contratación de productos financieros.
+
+2. MODELO DE DATOS BASE - TUSFINANZAS
+
+Implementa los dominios usando SQLAlchemy 2.0 y Pydantic v2, de acuerdo con el modelo de nueve entidades definido en el Prompt 01:
+
+* `Usuario`, `Rol`, `UsuarioRol`.
+* `FuenteIngreso`, `Ingreso`, `DeduccionIngreso`.
+* `CategoriaGasto`, `Deuda`, `Gasto`.
+
+Reglas generales:
+* Utilizar UUIDv4 como identificador principal de las entidades de negocio, salvo catálogos simples como `roles`.
+* Definir campos obligatorios (`NOT NULL`) y opcionales de forma coherente.
+* Definir restricciones de unicidad, claves foráneas, índices y restricciones `CHECK`.
+* Declarar relaciones explícitas mediante `relationship()` de SQLAlchemy.
+* Definir `ondelete` y comportamiento de borrado de forma deliberada. Para movimientos financieros e historiales, preferir baja lógica o restricciones que eviten borrar información relevante accidentalmente.
+* Utilizar `NUMERIC(14,2)` u otra precisión justificada para importes monetarios, y mapearlos a `Decimal` en Python.
+* No utilizar `FLOAT`, `DOUBLE` ni conversiones intermedias a `float` para cálculos monetarios.
+* Definir una política de escala, precisión y redondeo; documentarla y aplicarla de forma consistente.
+* Definir moneda principal del usuario mediante código ISO 4217. No sumar ni comparar directamente cantidades de monedas distintas.
+* Definir con claridad la semántica de fechas: fecha de recepción del ingreso, fecha del gasto, vencimiento y zona horaria de timestamps.
+
+3. MODELS.PY (SQLALCHEMY 2.0)
+
+* Definir los modelos ORM que mapean las entidades y tablas de `tusfinanzas_db`.
+* Ubicar `Usuario`, `Rol` y `UsuarioRol` en `users/models.py`.
+* Ubicar `FuenteIngreso`, `Ingreso` y `DeduccionIngreso` en `incomes/models.py`.
+* Ubicar `CategoriaGasto` y `Gasto` en `expenses/models.py`.
+* Ubicar `Deuda` en `debts/models.py`.
+* El módulo `financial_analysis` debe consultar los modelos existentes para construir resultados agregados. Solo debe definir modelos ORM propios si existe una necesidad justificada de persistir snapshots, alertas o resultados auditables.
+* Definir claves primarias, foráneas, índices de consulta y relaciones ORM.
+* Incluir restricciones de integridad para impedir importes negativos y relaciones entre recursos de usuarios diferentes cuando sea posible a nivel de base de datos y completar las verificaciones en servicios.
+* No incluir lógica dependiente de HTTP en los modelos.
+* No almacenar contraseñas en texto plano, tokens de sesión ni secretos.
+* No duplicar en columnas persistentes valores que puedan derivarse con fiabilidad, salvo justificación documentada.
+
+4. SCHEMAS.PY (PYDANTIC V2)
+
+Crear esquemas separados por caso de uso, al menos:
+
+* Usuarios: `UserCreate`, `UserUpdate`, `UserResponse`, `UserPreferencesUpdate`.
+* Fuentes: `IncomeSourceCreate`, `IncomeSourceUpdate`, `IncomeSourceResponse`.
+* Ingresos: `IncomeCreate`, `IncomeUpdate`, `IncomeResponse`.
+* Deducciones: `IncomeDeductionCreate`, `IncomeDeductionResponse`.
+* Categorías: `ExpenseCategoryCreate`, `ExpenseCategoryUpdate`, `ExpenseCategoryResponse`.
+* Gastos: `ExpenseCreate`, `ExpenseUpdate`, `ExpenseResponse`.
+* Deudas: `DebtCreate`, `DebtUpdate`, `DebtResponse`.
+* Análisis: esquemas de resumen mensual, balance financiero, capacidad de ahorro estimada y sugerencias de gastos hormiga.
+
+Reglas de validación:
+* Nunca exponer `password_hash`, secretos, tokens de acceso ni refresh tokens en respuestas ordinarias.
+* Validar formatos de email, UUID, códigos ISO 4217, fechas y enumeraciones.
+* Validar que importes sean `Decimal` y cumplan las reglas de signo y precisión definidas.
+* Validar que el monto bruto de un ingreso sea mayor que cero.
+* Validar que las deducciones sean mayores o iguales a cero y que su suma no supere el ingreso bruto asociado.
+* Validar que los montos de gastos y pagos sean mayores que cero.
+* Validar que el saldo pendiente de una deuda no sea negativo ni supere el saldo inicial, salvo que exista una regla explícita y justificada.
+* Validar coherencia de fechas de inicio y fin de fuentes de ingreso, periodo del ingreso, fecha del gasto y vencimiento.
+* Rechazar campos adicionales no permitidos cuando puedan permitir asignar propiedad, estado, rol o saldo de forma insegura.
+* Validar actualizaciones parciales sin convertir campos omitidos en valores nulos involuntariamente.
+
+5. SERVICES.PY (LÓGICA DE NEGOCIO FINANCIERA)
+
+Implementar reglas y operaciones en los servicios, como mínimo:
+
+A. Ingresos y deducciones:
+* Crear, consultar, actualizar y desactivar fuentes de ingreso.
+* Registrar los ingresos efectivamente recibidos y relacionarlos con una fuente del mismo usuario.
+* Registrar deducciones asociadas a un ingreso concreto.
+* Calcular el neto de cada ingreso recibido con la fórmula: `monto_neto = monto_bruto - suma_deducciones`.
+* Calcular el ingreso neto mensual real sumando los importes netos efectivamente recibidos dentro del mes consultado.
+* Mantener separados los valores reales recibidos y los valores de referencia o estimados de las fuentes de ingreso.
+* Si se calcula un equivalente mensual a partir de una periodicidad, documentar la conversión utilizada y mostrarlo como estimación, no como ingreso recibido.
+* Evitar contar dos veces un mismo ingreso o deducción.
+
+B. Gastos y categorías:
+* Consultar categorías globales y categorías privadas del usuario.
+* Crear y administrar categorías personalizadas sin permitir que un usuario modifique categorías privadas de otro usuario.
+* Registrar gastos obligatorios, necesarios variables y discrecionales.
+* Diferenciar `FIJO`, `VARIABLE` y `OCASIONAL` de la clasificación por necesidad (`OBLIGATORIO`, `NECESARIO_VARIABLE`, `DISCRECIONAL`). Son dimensiones distintas y no deben confundirse.
+* Diferenciar gastos `PAGADO`, `PENDIENTE` y `VENCIDO`.
+* Permitir definir recurrencia y periodicidad sin generar movimientos duplicados.
+* Separar los importes efectivamente pagados de los compromisos pendientes.
+* Categorizar vivienda/arriendo, servicios públicos, alimentación, transporte, salud, educación, deudas, suscripciones, entretenimiento y otras categorías configurables.
+
+C. Deudas y pagos:
+* Registrar y consultar deudas del usuario.
+* Asociar un gasto de tipo pago a una deuda del mismo usuario.
+* Cuando el pago esté confirmado como pagado, actualizar el saldo pendiente en una única transacción.
+* Evitar descontar dos veces un mismo pago al reintentar una solicitud o cambiar su estado.
+* Cuando la información esté disponible, separar abono a capital, intereses y otros cargos; comprobar que la suma sea coherente con el total pagado.
+* No calcular tasas, condiciones contractuales ni cronogramas de amortización no especificados por el usuario o por los datos registrados.
+
+D. Análisis financiero:
+* Calcular los resúmenes mensuales a partir de los ingresos, deducciones, gastos y pagos registrados.
+* Definir el balance de caja real como: `ingresos netos efectivamente recibidos - gastos efectivamente pagados` en el periodo.
+* Si se presenta un balance proyectado, identificar por separado ingresos estimados, compromisos pendientes y supuestos utilizados.
+* Calcular una capacidad de ahorro estimada, explicando las entradas consideradas, el periodo y las limitaciones de los datos. No presentarla como dinero garantizado.
+* Permitir filtrar análisis por mes, año, categoría y tipo de movimiento.
+* No mezclar monedas ni periodos distintos sin reglas explícitas.
+
+E. Detección de gastos hormiga:
+* Analizar patrones de movimientos de importe individual reducido, alta frecuencia, repetición por comercio o categoría y acumulación durante el periodo.
+* No clasificar un movimiento como gasto hormiga únicamente por estar debajo de un umbral monetario universal.
+* Utilizar umbrales configurables y, cuando sea posible, relativos al ingreso y al comportamiento histórico del usuario.
+* Generar sugerencias `HORMIGA_POTENCIAL` explicables; no reclasificar definitivamente los gastos sin confirmación del usuario.
+* Mostrar importe acumulado, frecuencia, periodo, categoría/comercio y movimientos que sustentan cada sugerencia.
+* Permitir confirmar, descartar o reclasificar una sugerencia.
+* No afirmar que un gasto es innecesario sin conocer su contexto.
+
+F. Transacciones y errores:
+* Utilizar transacciones controladas para operaciones que modifiquen varias entidades relacionadas.
+* Aplicar `commit()` solo al completar la operación y `rollback()` ante errores.
+* Evitar operaciones parciales al registrar ingresos con deducciones o pagos asociados a deudas.
+* Lanzar excepciones de dominio consistentes; traducirlas a respuestas HTTP en la capa correspondiente.
+
+6. ROUTES.PY (FASTAPI)
+
+* Crear endpoints RESTful con verbos HTTP adecuados (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`).
+* Utilizar códigos semánticos: `200 OK`, `201 Created`, `204 No Content`, `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found` y `422 Unprocessable Entity`.
+* Declarar dependencias de autenticación mediante `Depends(get_current_user)`.
+* No aceptar el usuario propietario como dato confiable en el body; derivarlo del usuario autenticado.
+* Mantener las rutas delgadas: validar el contrato HTTP, llamar al servicio y devolver el esquema de respuesta.
+* Aplicar paginación, filtros por periodo, categoría, estado y fuente cuando corresponda.
+* Utilizar prefijo/versionado coherente, por ejemplo `/api/v1`.
+* No devolver información de otra cuenta ni incluir campos sensibles en errores o respuestas.
+
+Endpoints orientativos que deben contrastarse con la arquitectura real:
+
+* `auth`: `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`.
+* `users`: `GET /users/me`, `PATCH /users/me`, `PATCH /users/me/preferences`.
+* `incomes`: `POST /income-sources`, `GET /income-sources`, `PATCH /income-sources/{id}`, `POST /incomes`, `GET /incomes`, `GET /incomes/{id}`, `POST /incomes/{id}/deductions`.
+* `expenses`: `GET /expense-categories`, `POST /expense-categories`, `PATCH /expense-categories/{id}`, `POST /expenses`, `GET /expenses`, `GET /expenses/{id}`, `PATCH /expenses/{id}`, `PATCH /expenses/{id}/payment-status`.
+* `debts`: `POST /debts`, `GET /debts`, `GET /debts/{id}`, `PATCH /debts/{id}`, `GET /debts/{id}/payments`.
+* `financial_analysis`: `GET /financial-analysis/monthly-summary`, `GET /financial-analysis/balance`, `GET /financial-analysis/saving-capacity`, `GET /financial-analysis/recurring-expenses`, `GET /financial-analysis/ant-expenses`, y endpoints para confirmar o descartar sugerencias si el diseño las persiste.
+
+No implementar endpoints únicamente porque aparezcan en esta lista: confirmar que cada operación esté respaldada por el modelo de datos y las reglas del negocio. Documentar los endpoints omitidos o modificados y su justificación.
+
+7. CUESTIONARIO TÉCNICO DE VALIDACIÓN (30 PREGUNTAS CLAVE)
+
+Responder este cuestionario con referencias a los archivos y componentes reales del proyecto. Si una respuesta no puede verificarse, indicarlo; no repetir la respuesta esperada como si ya estuviera implementada.
+
+1) ¿Dónde se define la conexión a PostgreSQL `tusfinanzas_db`? -> Debería estar en `app/core/database.py`.
+2) ¿Qué clase base se utiliza para los modelos ORM de SQLAlchemy? -> `DeclarativeBase` o una clase `Base` equivalente.
+3) ¿Dónde se centraliza la configuración de entorno? -> En `app/core/config.py`, leyendo variables desde `.env` sin exponer secretos.
+4) ¿Qué archivo concentra el manejo de excepciones? -> En una estructura equivalente a `app/core/exceptions.py` y su registro en `app/main.py`.
+5) ¿Dónde se realiza el hashing y la verificación de contraseñas? -> En `app/core/security.py` o un servicio de seguridad dedicado.
+6) ¿Dónde se declaran `Usuario`, `Rol` y `UsuarioRol`? -> En `app/users/models.py`.
+7) ¿Qué modelo contiene `password_hash` y qué esquema evita exponerlo? -> `Usuario`; `UserResponse` no debe incluirlo.
+8) ¿Dónde se valida que el email sea único al registrar un usuario? -> En `app/users/services.py`, respaldado por una restricción `UNIQUE` en la base de datos.
+9) ¿Dónde se define el endpoint de login? -> En `app/auth/routes.py`.
+10) ¿Cómo se obtiene el usuario autenticado en una ruta protegida? -> Mediante `Depends(get_current_user)` y la validación de token correspondiente.
+11) ¿Qué archivo registra los routers de todos los dominios? -> `app/main.py` mediante `app.include_router()`.
+12) ¿Qué endpoint puede utilizarse como health check? -> Por ejemplo, `GET /api/v1/health`.
+13) ¿Qué entidades representan las fuentes de dinero y los ingresos realmente recibidos? -> `FuenteIngreso` e `Ingreso` (`app/incomes/models.py`).
+14) ¿Dónde se registra una deducción aplicada a un ingreso? -> En `DeduccionIngreso` (`app/incomes/models.py`) y mediante servicios de `app/incomes/services.py`.
+15) ¿Cómo se calcula el neto de un ingreso? -> `monto_bruto - suma_deducciones`, usando `Decimal`.
+16) ¿Dónde se calcula el ingreso neto mensual real? -> En `app/incomes/services.py` o en un servicio de análisis que agregue ingresos netos efectivamente recibidos.
+17) ¿Qué diferencia existe entre un ingreso recibido y un monto de referencia de una fuente? -> El primero representa dinero recibido; el segundo es una referencia o estimación y no debe sumarse como ingreso real.
+18) ¿Dónde se declaran las categorías de gasto? -> En `app/expenses/models.py`, mediante `CategoriaGasto`.
+19) ¿Qué entidad representa un movimiento de gasto? -> `Gasto` (`app/expenses/models.py`).
+20) ¿Dónde se controla que una categoría privada pertenezca al usuario que registra el gasto? -> En `app/expenses/services.py`, comprobando propiedad y alcance de la categoría.
+21) ¿Qué diferencia existe entre `FIJO`, `VARIABLE`, `OCASIONAL` y `OBLIGATORIO`, `NECESARIO_VARIABLE`, `DISCRECIONAL`? -> Los primeros describen comportamiento/periodicidad; los segundos describen clasificación por necesidad.
+22) ¿Qué estados permiten distinguir si un gasto ya afectó la caja del usuario? -> `PAGADO`, `PENDIENTE` y `VENCIDO`; solo el pago confirmado se incluye en el balance de caja real.
+23) ¿Qué entidad representa una obligación financiera pendiente? -> `Deuda` (`app/debts/models.py`).
+24) ¿Dónde se actualiza el saldo pendiente de una deuda después de un pago? -> En `app/debts/services.py` o en un servicio transaccional que coordine deuda y gasto.
+25) ¿Cómo se evita descontar dos veces el mismo pago de una deuda? -> Mediante control transaccional, validación de estado/idempotencia y actualización única del saldo.
+26) ¿Qué fórmula define el balance de caja mensual real? -> Ingresos netos efectivamente recibidos menos gastos efectivamente pagados dentro del periodo.
+27) ¿Cómo debe presentarse la capacidad de ahorro? -> Como estimación explicable, indicando datos, periodo y supuestos; nunca como dinero garantizado.
+28) ¿Cómo se detectan posibles gastos hormiga? -> Mediante patrones de importe, frecuencia, repetición y acumulación; la sugerencia debe ser explicable y confirmable por el usuario.
+29) ¿Dónde se verifica que un usuario no consulte ingresos, gastos o deudas de otra cuenta? -> En los servicios y consultas filtradas por el usuario autenticado, reforzadas por claves foráneas y restricciones pertinentes.
+30) ¿Por qué se utilizan `Decimal` y `NUMERIC` en vez de `float`/`FLOAT`? -> Para conservar precisión decimal en importes y evitar errores de representación binaria en cálculos monetarios.
+
+--------------------------------------------------------------------------------
+8. CRITERIOS DE ENTREGA DE LA PARTE 2
+--------------------------------------------------------------------------------
+
+Al generar o completar cada módulo:
+* Entregar el contenido completo de los archivos nuevos o modificados, indicando su ruta exacta.
+* Explicar brevemente la responsabilidad de cada archivo y las dependencias entre módulos.
+* Incluir modelos, esquemas, servicios, rutas y migraciones o scripts SQL cuando sean necesarios.
+* Actualizar `app/main.py` para registrar los routers implementados.
+* Actualizar dependencias solo cuando sea necesario y justificar cualquier incorporación o eliminación.
+* Mantener compatibilidad entre el esquema ORM, la base de datos y los contratos JSON.
+* Incluir ejemplos de request/response JSON y códigos HTTP para los casos principales.
+* Incluir ejemplos numéricos verificables para ingreso bruto, deducciones, ingreso neto, gastos pagados, deudas y balance mensual.
+* Separar claramente las operaciones reales de las estimaciones y los resultados derivados.
+* Indicar los comandos necesarios para ejecutar migraciones, iniciar el backend y comprobar los endpoints.
+* No afirmar que una prueba fue ejecutada si únicamente se escribió el código o se razonó sobre ella.
+
+Antes de generar código, presenta un diagnóstico breve de la estructura existente y señala qué módulos se crearán, modificarán o conservarán. Después implementa de forma ordenada, respetando dependencias y evitando reemplazar archivos completos sin necesidad.
+
+--------------------------------------------------------------------------------
+9. RESULTADO ESPERADO
+--------------------------------------------------------------------------------
+
+Un backend modular para TusFinanzas que permita registrar usuarios, fuentes de ingreso, ingresos recibidos, deducciones, categorías, gastos y deudas; calcular ingresos netos mensuales y balances; y detectar patrones de gastos hormiga potenciales con criterios explicables.
+
+La entrega debe garantizar:
+* Arquitectura por dominios y separación clara de responsabilidades.
+* Modelo de datos relacional coherente y normalizado.
+* Precisión decimal en operaciones monetarias.
+* Separación entre valores reales, pendientes y estimados.
+* Seguridad y privacidad estricta por usuario mediante RBAC y Ownership.
+* API REST consistente, documentada y preparada para integrarse con React.
+* Reglas financieras explícitas, verificables y sin supuestos ocultos.
+* Código mantenible, tipado y documentado.
+
+El objetivo es entregar una base técnica sólida y verificable. No declarar el sistema "100% funcional" o "listo para producción" sin haber ejecutado las verificaciones correspondientes y documentado sus resultados.

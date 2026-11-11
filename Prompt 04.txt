@@ -1,0 +1,689 @@
+# ==============================================================================
+# PROMPT 4: HARDENING, PREPARACIÓN PARA PRODUCCIÓN Y FINALIZACIÓN VISUAL DEL FRONTEND
+# Proyecto: Plataforma de Finanzas Personales (TusFinanzas)
+# Base de Datos: tusfinanzas_db (PostgreSQL 18)
+# Stack: FastAPI + SQLAlchemy 2.0 + Pydantic v2 + React + TypeScript + Vite
+# ===============================================================================
+
+Actúa como Arquitecto de Seguridad, Backend Senior y Frontend Lead, especialista en FastAPI, PostgreSQL 18, SQLAlchemy 2.0, Pydantic v2, React, TypeScript, Vite, seguridad OWASP, Clean Architecture, diseño de interfaces responsive y experiencia de usuario para aplicaciones financieras.
+
+Tu misión es endurecer y preparar TusFinanzas para un despliegue seguro, sin romper la arquitectura existente, y FINALIZAR TODAS LAS VISTAS DEL FRONTEND para entregar una aplicación visualmente coherente, agradable, moderna, accesible y completamente responsive.
+
+Esta fase continúa los PROMPTS 01, 02 y 03 de TusFinanzas. Debes tratarlos como referencia funcional y técnica obligatoria. El Prompt 03 ya establece una base funcional de frontend; ahora debes auditarla, completarla y elevar su calidad visual y de experiencia de usuario. No te limites a proponer recomendaciones ni a crear una maqueta: inspecciona el proyecto real, implementa los cambios y verifica el resultado.
+
+------------------------------------------------------------------------------
+0. CONTEXTO Y REGLAS DE CONTINUIDAD
+------------------------------------------------------------------------------
+
+TusFinanzas es una aplicación de finanzas personales que permite a cada usuario:
+* Registrar fuentes de ingreso, ingresos efectivamente recibidos y deducciones.
+* Calcular el ingreso neto real de un periodo y distinguirlo de las proyecciones.
+* Registrar, categorizar y consultar gastos obligatorios, necesarios variables y discrecionales.
+* Diferenciar gastos fijos, variables y ocasionales, así como pagos realizados, pendientes y vencidos.
+* Registrar deudas, consultar saldos y seguir sus pagos.
+* Identificar posibles gastos hormiga a partir de patrones explicables, sin asumir automáticamente que todo gasto pequeño es innecesario.
+* Consultar balances mensuales, distribución de gastos y una estimación descriptiva de la capacidad de ahorro.
+
+Reglas obligatorias de continuidad:
+1. Inspecciona el repositorio real antes de modificar archivos. Revisa especialmente los resultados e implementación de los Prompts 01, 02 y 03.
+2. Mantén PostgreSQL 18 y la base de datos `tusfinanzas_db`.
+3. Conserva el modelo de referencia de nueve entidades: `usuarios`, `roles`, `usuario_roles`, `fuentes_ingreso`, `ingresos`, `deducciones_ingreso`, `categorias_gasto`, `deudas` y `gastos`, salvo que el código o una decisión técnica documentada justifique una evolución segura.
+4. Los roles de referencia son `ADMINISTRADOR` y `USUARIO`. El administrador gestiona parámetros técnicos, catálogos globales y estado de cuentas, pero NO obtiene acceso automático al detalle privado de ingresos, gastos, deudas o análisis financieros de los usuarios.
+5. Un `USUARIO` solo puede acceder a sus propios registros financieros. El backend es la autoridad definitiva para validar esta propiedad.
+6. No inventes tablas, columnas, endpoints, datos, reglas de negocio ni funcionalidades existentes. Comprueba el código, el esquema y los contratos reales.
+7. No sustituyas archivos completos sin necesidad. Conserva código válido, convenciones y decisiones visuales compatibles; refactoriza de forma incremental y justificada.
+8. No cambies las reglas financieras establecidas en fases anteriores sin documentar el motivo, el impacto en datos y la migración necesaria.
+9. No asumas legislación tributaria, porcentajes de deducción, intereses legales ni criterios universales para clasificar un gasto como prescindible.
+10. TusFinanzas es una herramienta de registro y análisis descriptivo. No debe presentarse como asesor financiero profesional ni emitir recomendaciones personalizadas de inversión, crédito, endeudamiento o tributación.
+11. No declares que el sistema está listo para producción, completamente seguro o 100% funcional si no ejecutaste y documentaste las verificaciones correspondientes.
+12. Nunca utilices importes, movimientos o datos financieros ficticios para aparentar que una vista está terminada. Los datos de demostración, si se necesitan, deben estar aislados en un entorno de desarrollo y claramente identificados.
+
+------------------------------------------------------------------------------
+1. OBJETIVOS DE ESTA FASE
+------------------------------------------------------------------------------
+
+A. Seguridad y preparación para producción:
+* Endurecer configuración y secretos por ambiente.
+* Mejorar autenticación, sesiones, autorización y aislamiento de datos.
+* Mitigar riesgos relevantes de OWASP.
+* Configurar CORS, cookies, cabeceras, logging y manejo seguro de errores.
+* Revisar dependencias y configuración de despliegue.
+
+B. Finalización visual y funcional del frontend:
+* Auditar todas las páginas y componentes creados en el Prompt 03.
+* Completar las vistas de autenticación, resumen, ingresos, gastos, deudas, análisis financiero y perfil/preferencias.
+* Aplicar un sistema visual común, elegante, legible y consistente.
+* Hacer responsive cada página, tabla, formulario, gráfico, menú y modal.
+* Mejorar la usabilidad de formularios, filtros, estados, confirmaciones y mensajes.
+* Verificar accesibilidad básica y navegación por teclado.
+* Mantener integración con los endpoints reales del backend.
+
+C. Documentación:
+* Crear o actualizar `READMEv3.md` con hardening, despliegue, decisiones de seguridad y guía visual del frontend.
+* Registrar los cambios de interfaz y las verificaciones responsive realizadas.
+
+------------------------------------------------------------------------------
+2. DIAGNÓSTICO OBLIGATORIO ANTES DE MODIFICAR
+------------------------------------------------------------------------------
+
+Realiza una revisión completa del repositorio y entrega primero un diagnóstico breve:
+1. Identifica la estructura real de backend y frontend.
+2. Verifica autenticación, emisión y renovación de tokens, logout, gestión de sesiones y recuperación del usuario autenticado.
+3. Revisa controles RBAC y ownership en servicios y endpoints.
+4. Inspecciona configuración `.env`, CORS, cookies, cabeceras HTTP, errores, logs y manejo de excepciones.
+5. Revisa modelos, migraciones Alembic, claves foráneas, índices y restricciones de las nueve entidades de referencia.
+6. Comprueba que operaciones monetarias continúen usando `Decimal` en Python y `NUMERIC`/`DECIMAL` en PostgreSQL.
+7. Revisa todas las rutas del frontend y crea un inventario de vistas existentes, incompletas, duplicadas o ausentes.
+8. Comprueba qué pantallas consumen endpoints reales y cuáles utilizan datos simulados, valores estáticos o componentes sin funcionalidad.
+9. Inspecciona estilos globales, variables CSS, fuentes, iconos, componentes, breakpoints y dependencias visuales actuales.
+10. Identifica errores de TypeScript, navegación, formularios, responsive, accesibilidad y estados de carga/error.
+11. Revisa las dependencias por compatibilidad y vulnerabilidades conocidas disponibles en el entorno. No actualices paquetes indiscriminadamente.
+12. Presenta:
+   * Elementos correctos que deben conservarse.
+   * Riesgos críticos de seguridad.
+   * Vistas incompletas o inconsistentes.
+   * Problemas responsive detectados.
+   * Cambios concretos de backend y frontend que realizarás.
+   * Dependencias o migraciones que se requieran.
+
+Después del diagnóstico, continúa con la implementación. No entregues únicamente una auditoría o una lista de sugerencias.
+
+------------------------------------------------------------------------------
+3. CONFIGURACIÓN SEGURA POR AMBIENTES
+------------------------------------------------------------------------------
+
+Centraliza la configuración del backend mediante `pydantic-settings` o el mecanismo ya utilizado por el proyecto, manteniendo una única fuente de verdad en `app/core/config.py` o su equivalente.
+
+Plantilla de referencia para `.env.example` (sin credenciales reales):
+
+```env
+APP_NAME="TusFinanzas API"
+APP_ENV=development
+APP_DEBUG=false
+
+# Autenticación y sesiones
+APP_JWT_SECRET=REEMPLAZAR_POR_UN_SECRETO_ALEATORIO_LARGO_Y_UNICO
+APP_JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+REFRESH_TOKEN_EXPIRE_DAYS=7
+APP_COOKIE_SECURE=false
+APP_COOKIE_HTTPONLY=true
+APP_COOKIE_SAMESITE=lax
+
+# Base de datos
+DATABASE_URL=postgresql://USUARIO:CONTRASENA@localhost:5432/tusfinanzas_db
+
+# Orígenes autorizados
+APP_CORS_ORIGINS=["http://localhost:5173"]
+
+# Configuración operativa
+APP_LOG_LEVEL=INFO
+```
+
+Requisitos:
+* Mantén perfiles diferenciados `development`, `test` y `production`.
+* En producción, exige secretos fuertes y únicos. La aplicación debe fallar al arrancar si detecta valores inseguros o de ejemplo.
+* Nunca incluyas contraseñas, secretos, tokens ni URLs con credenciales en el código fuente, documentación pública o frontend.
+* El archivo `.env` real debe estar incluido en `.gitignore`.
+* Mantén `.env.example` con nombres y ejemplos no sensibles.
+* Comprueba que variables obligatorias tengan validación de tipo y valor.
+* No expongas configuración sensible mediante endpoints públicos ni logs.
+* No uses variables `VITE_*` para secretos: las variables Vite quedan accesibles desde el navegador.
+* Documenta cómo configurar secretos en el entorno de despliegue sin escribirlos directamente en comandos o repositorios.
+
+------------------------------------------------------------------------------
+4. CORS, COOKIES Y CABECERAS DE SEGURIDAD
+------------------------------------------------------------------------------
+
+Configura CORS de acuerdo con el ambiente:
+
+* Desarrollo: permite exclusivamente los orígenes locales necesarios, normalmente `http://localhost:5173`.
+* Producción: permite solo dominios HTTPS explícitos configurados en `APP_CORS_ORIGINS`.
+* No utilices `allow_origins=["*"]` cuando se envíen cookies o credenciales.
+* Limita métodos y encabezados HTTP a los realmente utilizados por la API.
+* Configura `allow_credentials` solo cuando el flujo de autenticación lo requiera.
+* Evita permitir encabezados o métodos innecesarios.
+
+Cookies:
+* Cookies de sesión o refresh token con `HttpOnly`.
+* `Secure=true` en producción bajo HTTPS.
+* `SameSite` configurado de acuerdo con el despliegue y el flujo real.
+* Define rutas, dominios y expiración con el menor alcance necesario.
+* Si el frontend y backend tienen orígenes que exigen un esquema `SameSite=None`, utiliza `Secure=true` y revisa las medidas CSRF correspondientes.
+* No asumas que `SameSite` por sí solo resuelve todos los riesgos CSRF.
+
+Cabeceras y transporte:
+* Configura HTTPS/TLS en producción mediante el proxy o infraestructura correspondiente.
+* Añade cabeceras de seguridad pertinentes, por ejemplo `X-Content-Type-Options`, política de referrer, protección contra framing mediante CSP/frame-ancestors y una Content Security Policy compatible con la aplicación.
+* Evalúa HSTS únicamente cuando todo el dominio esté preparado para HTTPS.
+* Evita políticas CSP permisivas que utilicen `unsafe-eval` o `unsafe-inline` sin justificación.
+* No expongas el servidor de desarrollo ni Swagger en producción sin una política de acceso deliberada.
+
+------------------------------------------------------------------------------
+5. AUTENTICACIÓN, SESIONES Y AUTORIZACIÓN
+------------------------------------------------------------------------------
+
+5.1. Gestión de contraseñas
+* Conserva hashing seguro con la biblioteca vigente implementada en el proyecto; si se utiliza bcrypt, verifica sus parámetros y compatibilidad.
+* Nunca almacenes contraseñas en texto plano ni uses cifrado reversible para sustituir hashing de contraseñas.
+* Valida contraseñas en el backend. La validación visual del frontend no sustituye la validación de servidor.
+* Evita mensajes de autenticación que permitan enumerar si un correo está registrado.
+* Considera limitación de intentos, demoras progresivas o rate limiting para login y recuperación de acceso.
+* En verificaciones de usuarios inexistentes, evita diferencias de tiempo evidentes cuando sea razonable hacerlo.
+
+5.2. JWT y refresh tokens
+* Fija explícitamente el algoritmo de firma permitido; no aceptes el algoritmo indicado libremente por el token.
+* Valida firma, expiración, emisor/audiencia cuando estén configurados y demás claims requeridos.
+* Utiliza access tokens de duración limitada.
+* Implementa rotación de refresh tokens cuando aplique y revoca el token anterior al renovarlo.
+* Implementa logout que invalide o revoque la sesión/refresh token según el diseño adoptado.
+* Evita almacenar JWT en `localStorage` o `sessionStorage`.
+* Documenta si la autenticación usa cookies HttpOnly o un flujo equivalente y cómo obtiene el frontend el estado de sesión.
+* Si se usan cookies para autenticar operaciones mutables, implementa protección CSRF apropiada (token CSRF, validación de origen y/o estrategia equivalente documentada).
+
+5.3. RBAC y ownership
+
+Matriz base de permisos:
+
+| Rol | Permisos generales | Restricciones |
+|---|---|---|
+| `ADMINISTRADOR` | Gestionar usuarios, estados de cuenta, catálogos globales y parámetros técnicos autorizados | No tiene acceso automático al detalle privado de ingresos, gastos, deudas ni análisis financieros de usuarios |
+| `USUARIO` | Registrar y consultar sus propias fuentes de ingreso, ingresos, deducciones, categorías privadas, gastos, deudas y análisis | No puede consultar ni modificar datos financieros pertenecientes a otro usuario |
+
+Reglas obligatorias:
+* Obtén la identidad del usuario desde la sesión/token validado, nunca desde un `usuario_id` enviado por el navegador.
+* Valida propiedad en la capa de servicios y/o repositorios, no exclusivamente en el frontend ni mediante ocultar botones.
+* Aplica el principio de mínimo privilegio a todas las rutas.
+* Verifica ownership al consultar, editar, eliminar, categorizar y asociar movimientos, fuentes, deducciones, gastos o deudas.
+* Impide asignaciones de roles o estados privilegiados desde solicitudes públicas de registro.
+* Rechaza campos adicionales que permitan manipular propietario, rol, saldo, estado privilegiado o datos internos.
+* Administra los catálogos globales con permisos diferenciados de las categorías privadas de cada usuario.
+* Responde con códigos HTTP coherentes `401`, `403` o `404`, sin revelar información privada de terceros.
+* Verifica que los procesos de análisis agreguen únicamente los movimientos del usuario autenticado.
+
+------------------------------------------------------------------------------
+6. PROTECCIÓN DE DATOS FINANCIEROS Y OWASP
+------------------------------------------------------------------------------
+
+Endurece el backend siguiendo los riesgos aplicables de OWASP Top 10 (referencia de la serie original: OWASP Top 10:2021):
+
+* A01 – Broken Access Control: pruebas de ownership y roles en todos los endpoints privados.
+* A02 – Cryptographic Failures: hashing robusto, transporte TLS, gestión de secretos y protección de respaldos.
+* A03 – Injection: SQLAlchemy parametrizado; prohíbe concatenar entradas del usuario en consultas SQL.
+* A04 – Insecure Design: controles de negocio, validación de saldos, idempotencia donde aplique y limitación de abuso.
+* A05 – Security Misconfiguration: CORS restrictivo, cookies seguras, cabeceras y configuración por ambiente.
+* A07 – Identification and Authentication Failures: login, expiración, renovación, revocación y límites de intentos.
+* A09 – Security Logging and Monitoring Failures: logs útiles, alertas y auditoría sin filtrar información sensible.
+
+Protección específica de TusFinanzas:
+* No registrar en logs contraseñas, JWT, refresh tokens, claves, números de cuenta ni importes o descripciones financieras que no sean imprescindibles.
+* No incluir detalles de gastos, deudas o ingresos en mensajes de error, trazas enviadas al navegador o analítica de terceros.
+* Limita la información devuelta por cada endpoint al mínimo necesario.
+* Revisa exportaciones, reportes, descargas y respaldos para prevenir accesos no autorizados.
+* No expongas identificadores internos de sesión ni tokens en URLs.
+* Aplica límites razonables de tamaño, paginación y frecuencia a endpoints de consulta y exportación.
+* Evita cachear respuestas financieras privadas en cachés compartidas. Configura políticas de caché según sensibilidad.
+* Documenta retención, eliminación lógica y tratamiento de datos de cuenta conforme a las decisiones reales del proyecto; no afirmes cumplimiento legal sin una revisión específica.
+
+------------------------------------------------------------------------------
+7. HARDENING DE LA CAPA DE API Y BASE DE DATOS
+------------------------------------------------------------------------------
+
+* Centraliza las excepciones y devuelve errores con estructura estable y mensajes seguros.
+* Diferencia `400`, `401`, `403`, `404`, `409`, `422` y `500` cuando corresponda.
+* No envíes stack traces, consultas SQL, rutas del servidor ni detalles de infraestructura al cliente.
+* Mantén validación de entrada con Pydantic v2 y validaciones de negocio en servicios.
+* Revisa que las operaciones que modifican varias entidades utilicen transacciones atómicas.
+* Evita actualizaciones parciales de ingresos, deducciones, pagos y saldos de deuda.
+* Aplica restricciones `NOT NULL`, `CHECK`, `UNIQUE` y claves foráneas que estén justificadas por el modelo.
+* Mantén claves foráneas e índices coherentes con filtros por propietario, fecha, estado y categoría.
+* Utiliza Alembic para los cambios de esquema. No uses `create_all()` como mecanismo de migración productiva.
+* No elimines ni recrees datos existentes para resolver inconsistencias.
+* Revisa concurrencia, idempotencia y doble envío en operaciones de pagos o deducciones.
+* Mantén exactitud monetaria: `Decimal` en Python y `NUMERIC`/`DECIMAL` en PostgreSQL; nunca `float` para dinero.
+* No sumes monedas distintas ni calcules conversiones de divisas sin un módulo de tasas y fechas debidamente definido.
+* Evita contabilizar un pago de deuda más de una vez en los resúmenes.
+
+------------------------------------------------------------------------------
+8. FINALIZACIÓN DEL DISEÑO VISUAL Y RESPONSIVE DEL FRONTEND
+------------------------------------------------------------------------------
+
+Esta sección es OBLIGATORIA y tiene prioridad como objetivo visual de esta cuarta fase. Debes finalizar todas las vistas de TusFinanzas, no únicamente la página principal. El resultado debe sentirse como una aplicación completa, coherente y lista para que una persona pueda utilizarla cómodamente desde teléfono, tablet o computador.
+
+8.1. Auditoría y consistencia visual
+
+* Revisa todas las páginas existentes antes de rediseñarlas.
+* Conserva componentes, estilos y patrones válidos del Prompt 03.
+* Elimina inconsistencias de espaciado, tipografía, colores, tamaños de botones, formularios, tablas y tarjetas.
+* Evita que cada página parezca diseñada por separado.
+* No reemplaces la identidad visual existente si ya es coherente; mejora lo necesario y documenta los cambios.
+* Si no existe una identidad visual definida, crea una propuesta visual propia, sobria y profesional, apropiada para una aplicación de finanzas personales.
+* No agregues frameworks CSS pesados si el proyecto ya trabaja con CSS propio. Prefiere CSS moderno, variables CSS, CSS Modules o la convención establecida.
+* No añadas dependencias solo por decoración. Justifica librerías de gráficos, iconos o componentes si las necesitas.
+
+8.2. Dirección visual recomendada
+
+La interfaz debe transmitir confianza, claridad, tranquilidad y control. Debe evitar el aspecto de una hoja de cálculo saturada o de un panel empresarial excesivamente complejo.
+
+Criterios:
+* Estética moderna, limpia y profesional.
+* Fondo neutro y superficies diferenciadas con moderación.
+* Paleta consistente con uno o dos colores principales de marca y colores semánticos para estados.
+* Tipografía legible, con jerarquía clara entre títulos, subtítulos, etiquetas y valores monetarios.
+* Espaciado uniforme, alineaciones cuidadas y tamaños consistentes.
+* Tarjetas con bordes, radios y sombras discretas; evita exceso de efectos, gradientes o elementos decorativos.
+* Iconografía consistente y fácil de reconocer.
+* Gráficos simples que faciliten comprender la información, sin adornos innecesarios.
+* Los valores financieros deben destacar por jerarquía tipográfica, no por llenar la pantalla con colores fuertes.
+* Ingresos y gastos pueden diferenciarse visualmente, pero no dependas solamente del color para explicar su naturaleza.
+* Utiliza etiquetas de texto, iconos o símbolos además del color para indicar estados.
+* Evita animaciones constantes. Usa transiciones breves y respeta `prefers-reduced-motion`.
+
+Define tokens globales para:
+* Colores de marca, fondo, superficie, texto principal, texto secundario, bordes, éxito, advertencia, error e información.
+* Tipografía, escalas de tamaño, pesos y alturas de línea.
+* Espaciado y anchuras de contenido.
+* Radios, bordes y sombras.
+* Alturas de controles y tamaños de iconos.
+* Breakpoints responsive.
+* Estados hover, focus, active, disabled y loading.
+
+No disperses valores visuales arbitrarios en cada componente. Centraliza los tokens en hojas de estilo globales.
+
+8.3. Layout principal y navegación
+
+Finaliza un layout general que funcione de forma consistente en todas las vistas privadas.
+
+Escritorio:
+* Sidebar persistente con navegación clara.
+* Área principal con ancho de lectura controlado y espacio suficiente.
+* Header con título o breadcrumb de la sección, periodo cuando corresponda y acceso al perfil.
+* Mostrar de forma clara la cuenta activa y la opción de cerrar sesión.
+* El menú debe señalar la sección activa.
+
+Tablet:
+* Reducir el ancho del sidebar o convertirlo en navegación colapsable.
+* Mantener el contenido legible y evitar tarjetas demasiado estrechas.
+* Reorganizar indicadores y formularios en una o dos columnas según el espacio real.
+
+Móvil:
+* Sustituir el sidebar por un menú tipo drawer o navegación móvil claramente identificable.
+* El menú debe abrir/cerrar con control accesible, permitir cerrar con Escape, mantener foco razonable y no bloquear permanentemente el desplazamiento.
+* Evitar que el header ocupe demasiado alto.
+* Priorizar una navegación sencilla y accesible con el pulgar.
+* Mantener acciones principales visibles, sin saturar la pantalla.
+* No permitir desbordamiento horizontal general.
+
+Menú mínimo para usuario autenticado:
+* Resumen
+* Ingresos
+* Gastos
+* Deudas
+* Análisis financiero
+* Perfil y preferencias
+
+Los accesos administrativos, si existen, solo deben mostrarse a los roles autorizados. El backend debe validar permisos incluso cuando una ruta o botón no aparezca en la interfaz.
+
+8.4. Vistas que deben quedar finalizadas
+
+A. Acceso y registro (`/login` y `/register`)
+* Diseño visual cuidado, centrado y responsive.
+* Campos con etiquetas visibles, ayudas y validación.
+* Mostrar/ocultar contraseña mediante control accesible.
+* Indicador de envío y prevención de doble envío.
+* Mensajes de error que indiquen cómo corregir el problema sin exponer detalles internos.
+* Enlaces entre login y registro.
+* Presentar brevemente el propósito de TusFinanzas sin prometer asesoría financiera profesional.
+* No incluir campos para que el usuario se asigne rol de administrador.
+
+B. Resumen / Dashboard (`/dashboard`)
+* Encabezado claro con periodo seleccionado.
+* Indicadores: ingreso neto real, gastos pagados, compromisos pendientes/vencidos por separado, balance de efectivo y capacidad de ahorro estimada.
+* Cada indicador debe mostrar etiqueta, periodo y contexto; marcar claramente las estimaciones.
+* Gráfico de distribución de gastos por categoría, si existe información suficiente.
+* Resumen de ingresos y gastos del periodo.
+* Accesos rápidos para registrar ingreso o gasto.
+* Resumen de posibles gastos hormiga con enlace al análisis detallado.
+* Estados vacíos que expliquen cómo comenzar cuando no hay movimientos.
+* No inventar cifras ni mostrar cero como si significara que el dato existe cuando en realidad falta información.
+
+C. Ingresos (`/incomes`)
+* Vista de fuentes de ingreso y movimientos recibidos.
+* Resumen del bruto, deducciones y neto del periodo.
+* Formularios claros para crear/editar fuentes, ingresos y deducciones, según endpoints disponibles.
+* Mostrar periodicidad y distinguir ingresos reales de estimados.
+* Filtros por fecha, periodo y fuente.
+* Tabla adaptable a móvil, con tarjetas cuando sea más cómodo que una tabla.
+* Validación visible para que las deducciones no superen el ingreso bruto.
+
+D. Gastos (`/expenses`)
+* Listado con fecha, descripción, categoría, monto, naturaleza, necesidad, periodicidad y estado de pago.
+* Acciones para crear, consultar, editar y eliminar lógicamente según las operaciones reales de la API.
+* Filtros útiles y combinables por periodo, categoría, naturaleza, clasificación y estado.
+* Separación visual de gastos obligatorios, necesarios variables y discrecionales.
+* Diferenciación de gastos pagados, pendientes y vencidos.
+* Visualización de posibles gastos hormiga sin etiquetar automáticamente todos los gastos pequeños como innecesarios.
+* En formularios, explicar brevemente la diferencia entre naturaleza del gasto y nivel de necesidad.
+* Confirmación antes de acciones destructivas.
+
+E. Deudas (`/debts`)
+* Listado de deudas con acreedor, tipo, saldo inicial, saldo pendiente, estado y vencimiento.
+* Formulario de creación y edición.
+* Vista de detalle con resumen y pagos asociados cuando la API lo soporte.
+* Diferenciar saldo pendiente, capital abonado, intereses y cargos cuando esos datos estén disponibles.
+* Mostrar claramente vencimientos y estados.
+* No permitir editar arbitrariamente el saldo pendiente cuando la API espera que se derive de pagos confirmados.
+* Confirmar operaciones de registro de pago y evitar doble envío.
+
+F. Análisis financiero (`/analysis`)
+* Selector de periodo y comparación temporal cuando existan datos suficientes.
+* Visualización de ingreso neto real, gastos pagados, compromisos pendientes y balance.
+* Gráficos por categoría y evolución temporal solo con datos válidos.
+* Sección de posibles gastos hormiga con razones explicables: frecuencia, periodo, promedio y acumulado.
+* Explicación accesible de las fórmulas y supuestos usados para obtener indicadores.
+* Advertencia cuando el historial sea insuficiente.
+* Evitar etiquetas como “mala decisión” o juicios sobre hábitos. Usar expresiones neutrales y descriptivas.
+
+G. Perfil y preferencias (`/profile`)
+* Datos básicos de la cuenta.
+* Preferencia de moneda principal según API.
+* Preferencias de presentación que realmente estén soportadas.
+* Cambio de contraseña si existe endpoint seguro.
+* Información de sesión y cierre de sesión.
+* Confirmación antes de operaciones sensibles.
+
+H. Vistas auxiliares
+* Página no encontrada (404) con navegación de regreso.
+* Estado de acceso denegado (403) cuando corresponda.
+* Estado de sesión expirada con redirección segura.
+* Error de conexión con opción de reintento.
+* Estados vacíos por módulo con una acción principal clara.
+
+8.5. Formularios y componentes de interacción
+
+Finaliza y unifica componentes reutilizables, sin crear abstracciones innecesarias:
+* Botones primarios, secundarios, de peligro y de texto, con estados hover/focus/disabled/loading.
+* Inputs de texto, contraseña, fecha, número/importe, selectores, áreas de texto y controles de formulario.
+* Etiquetas, ayudas, validaciones y mensajes de error.
+* Tarjetas de resumen con jerarquía tipográfica consistente.
+* Badges de estado con etiqueta textual.
+* Tablas, paginación y filtros adaptables.
+* Diálogos o modales con cierre por teclado y foco accesible.
+* Toasts o avisos para éxito/error cuando sean adecuados.
+* Confirmaciones para eliminar, cerrar sesión en dispositivo o registrar pagos.
+* Componentes de carga, skeleton, error, reintento y ausencia de datos.
+* Selectores de mes/año y componentes de formato monetario.
+
+Cada control debe tener un propósito funcional. No dejes botones decorativos sin acción. Si una función aún no está disponible en backend, indica el estado y no simules que fue guardada.
+
+8.6. Responsive: criterios de aceptación
+
+Todas las vistas, no solo el Dashboard, deben revisarse en anchuras representativas:
+* Móvil pequeño: 320–360 px.
+* Móvil habitual: 375–430 px.
+* Tablet: 768 px.
+* Portátil: 1024–1280 px.
+* Escritorio amplio: 1440 px o más.
+
+Criterios:
+* Sin scroll horizontal global ni contenido cortado.
+* Textos largos, nombres de categorías y descripciones deben poder ajustarse sin romper el layout.
+* Botones y campos deben tener dimensiones cómodas para interacción táctil.
+* Formularios de varias columnas deben pasar a una columna en móviles.
+* Tarjetas e indicadores deben reorganizarse con una jerarquía clara.
+* Las tablas deben transformarse en tarjetas, utilizar scroll horizontal contenido con indicación clara o aplicar otra solución accesible; no reduzcas el texto hasta volverlo ilegible.
+* Gráficos deben redimensionarse sin recortar leyendas, etiquetas o tooltips.
+* El menú móvil no debe tapar permanentemente contenido ni permitir scroll de fondo accidental cuando esté abierto.
+* Modales y diálogos deben caber en viewport pequeño y permitir desplazamiento interno.
+* Header, footer y acciones fijas no deben cubrir campos o botones.
+* El zoom del navegador no debe romper la interfaz.
+* Comprueba diseño en orientación vertical y horizontal cuando resulte relevante.
+
+Puedes ajustar breakpoints según el diseño real, pero documenta los valores usados en los tokens CSS. No diseñes exclusivamente para una captura de escritorio.
+
+8.7. Accesibilidad y usabilidad
+
+* Usa HTML semántico y encabezados en orden lógico.
+* Asocia cada campo con una etiqueta; no utilices placeholders como única etiqueta.
+* Todos los controles deben ser operables con teclado.
+* Mantén un indicador de foco visible.
+* Añade textos alternativos cuando las imágenes transmitan información.
+* Proporciona nombres accesibles para botones que solo tengan iconos.
+* Mantén contraste suficiente entre texto y fondo.
+* No comuniques estados exclusivamente mediante color.
+* Respeta `prefers-reduced-motion`.
+* Gestiona foco en modales y menús desplegables.
+* Muestra mensajes de validación claros y asociados al campo correspondiente.
+* No uses animaciones, gráficos o tablas que dificulten la lectura de valores financieros.
+
+8.8. Fechas, moneda y visualización de importes
+
+* Respeta la moneda principal configurada para el usuario y su código ISO 4217.
+* No supongas que todos los usuarios usan COP.
+* Centraliza el formato de importes, fechas y periodos.
+* No uses `parseFloat()` ni aritmética binaria de `number` para cálculos monetarios.
+* Si la presentación requiere operaciones decimales, utiliza una biblioteca decimal apropiada; los cálculos financieros oficiales permanecen en backend.
+* No sumes o compares monedas diferentes.
+* Muestra signo, separadores y decimales de manera coherente.
+* Diferencia valores no disponibles, cero real y datos no registrados.
+* No reveles información financiera en notificaciones del navegador o logs de frontend.
+
+------------------------------------------------------------------------------
+9. INTEGRACIÓN FRONTEND-BACKEND Y EXPERIENCIA DE DATOS
+------------------------------------------------------------------------------
+
+* Mantén un cliente HTTP centralizado y base URL configurada mediante `VITE_API_BASE_URL`.
+* Usa los servicios por dominio ya definidos en el Prompt 03.
+* Alinea tipos TypeScript con OpenAPI cuando sea viable.
+* No inventes endpoints. Si una vista necesita un endpoint que no existe, identifica la carencia, implementa el backend de manera coherente o deja una limitación explícita.
+* Gestiona correctamente `401`, `403`, `404`, `409`, `422`, errores de red y `500`.
+* Evita mensajes técnicos de servidor en la interfaz.
+* Implementa estados de carga, éxito, error, vacío y reintento.
+* Evita dobles envíos y actualizaciones visuales inconsistentes.
+* Invalida o actualiza la caché tras crear, editar o eliminar registros.
+* Asegura que al cambiar de sesión o usuario no se muestren datos almacenados de otra cuenta.
+* Evita persistir datos financieros sensibles en almacenamiento local sin una necesidad y protección justificadas.
+* No almacenes access/refresh tokens en `localStorage` o `sessionStorage`.
+* No mantengas mocks o datos simulados activos en producción.
+* Comprueba que las solicitudes incluyan cookies/credenciales solo cuando el diseño de autenticación lo requiera.
+* Documenta la configuración de CSRF si se autentica mediante cookies.
+
+------------------------------------------------------------------------------
+10. CALIDAD, RENDIMIENTO Y MANTENIBILIDAD DEL FRONTEND
+------------------------------------------------------------------------------
+
+* Mantén TypeScript estricto y evita `any`.
+* Divide componentes grandes en unidades coherentes sin fragmentar en exceso.
+* Evita duplicar lógica de formatos, validaciones, formularios o llamadas API.
+* Utiliza carga diferida de rutas si reduce de forma razonable el tamaño inicial.
+* Evita renderizados y peticiones innecesarias.
+* Usa paginación o carga incremental cuando existan listados extensos.
+* No descargues todos los movimientos históricos si la vista solo requiere un periodo.
+* Usa gráficos accesibles, responsivos y con alternativa textual o tabular.
+* Optimiza imágenes y evita recursos remotos innecesarios.
+* Elimina CSS muerto, componentes duplicados y dependencias que no se utilicen.
+* Mantén errores y advertencias de consola bajo control.
+* Verifica que no haya claves privadas ni secretos en el bundle generado.
+
+------------------------------------------------------------------------------
+11. PRUEBAS DE SEGURIDAD, FUNCIONAMIENTO Y RESPONSIVE
+------------------------------------------------------------------------------
+
+Ejecuta las verificaciones posibles en el entorno y documenta los resultados exactos. No marques pruebas como aprobadas si no se ejecutaron.
+
+11.1. Seguridad backend
+
+1. Verificar que el backend no arranque en producción con secretos inseguros o variables críticas ausentes.
+2. Verificar CORS con orígenes permitidos y no permitidos.
+3. Verificar cookies `HttpOnly`, `Secure` en producción y configuración `SameSite`.
+4. Verificar expiración, renovación, rotación y revocación de tokens según el flujo implementado.
+5. Verificar logout y rechazo de sesiones revocadas.
+6. Verificar login con credenciales incorrectas y limitación de intentos cuando esté implementada.
+7. Verificar protección CSRF cuando se utilicen cookies para operaciones mutables.
+8. Verificar que el rol `USUARIO` no pueda acceder a datos financieros de otro usuario.
+9. Verificar que el rol `ADMINISTRADOR` no obtenga acceso al detalle privado financiero por defecto.
+10. Verificar que registros de roles o propiedad manipulados desde el frontend sean rechazados.
+11. Verificar que mensajes y logs no expongan secretos ni datos financieros innecesarios.
+12. Verificar consultas parametrizadas y validaciones de entrada.
+13. Verificar errores `401`, `403`, `404`, `409` y `422`.
+14. Verificar transacciones, rollback y prevención de dobles operaciones.
+
+11.2. Funcionalidad frontend
+
+1. Verificar que login y registro funcionen con endpoints reales.
+2. Verificar rutas públicas, privadas y redirecciones.
+3. Verificar que el logout limpie el estado de sesión y los datos en caché del usuario.
+4. Verificar que Resumen, Ingresos, Gastos, Deudas, Análisis y Perfil carguen y muestren estados adecuados.
+5. Verificar creación, edición y eliminación lógica de registros según disponibilidad de API.
+6. Verificar filtros, selectores de periodo y paginación.
+7. Verificar validaciones y mensajes de formulario.
+8. Verificar errores de API, conexión y reintentos.
+9. Verificar visualización de ingresos reales frente a estimados.
+10. Verificar separación entre gastos pagados, pendientes y vencidos.
+11. Verificar que indicadores y gráficos usen datos del usuario autenticado.
+12. Verificar que no existan botones sin acción ni datos ficticios activos.
+
+11.3. Revisión visual y responsive
+
+Verifica como mínimo:
+* `/login` y `/register`.
+* `/dashboard`.
+* `/incomes`.
+* `/expenses`.
+* `/debts`.
+* `/analysis`.
+* `/profile`.
+* Estados 403, 404, sesión expirada y error de conexión.
+
+Repite la revisión visual en los tamaños representativos establecidos en la sección 8.6. Comprueba:
+* Ausencia de desbordamientos horizontales.
+* Correcta adaptación de sidebar, header y menú móvil.
+* Reorganización de tarjetas, tablas, formularios y gráficos.
+* Legibilidad de importes, etiquetas y mensajes.
+* Interacción de menús, modales, botones y controles táctiles.
+* Navegación completa con teclado y foco visible.
+* Contraste y estados que no dependan exclusivamente del color.
+
+Si el entorno permite usar navegador automatizado o pruebas visuales, utilízalos. Si no se dispone de esa herramienta, realiza las comprobaciones estáticas y de compilación posibles y declara expresamente qué validación visual manual queda pendiente. No inventes capturas ni resultados.
+
+11.4. Comprobaciones de compilación y código
+
+Backend:
+* Importación y arranque de FastAPI.
+* Conexión a PostgreSQL y ejecución de migraciones en entorno disponible.
+* Revisión de OpenAPI y endpoints.
+* Ejecución de verificaciones automatizadas disponibles.
+
+Frontend:
+* Instalación reproducible de dependencias.
+* Ejecución de lint si el proyecto lo tiene configurado.
+* Ejecución de TypeScript/typecheck si está configurado.
+* `npm run build`.
+* Ejecución de `npm run dev` o vista previa cuando el entorno lo permita.
+* Inspección de consola y errores de compilación.
+
+------------------------------------------------------------------------------
+12. DOCUMENTACIÓN OBLIGATORIA: READMEv3.md
+------------------------------------------------------------------------------
+
+Crea o actualiza `READMEv3.md` sin duplicar documentación contradictoria. Debe contener:
+
+1. Descripción de TusFinanzas y alcance de esta fase.
+2. Arquitectura backend/frontend y estructura del proyecto.
+3. Configuración por ambientes y variables requeridas.
+4. Gestión de secretos y archivos excluidos del repositorio.
+5. Autenticación, JWT, cookies, refresh, logout y protección CSRF cuando aplique.
+6. Matriz RBAC (`ADMINISTRADOR`, `USUARIO`) y reglas de ownership.
+7. Controles de seguridad OWASP implementados y limitaciones pendientes.
+8. Configuración de CORS y cabeceras HTTP.
+9. Protección de información financiera y política de logging.
+10. Guía de ejecución local y despliegue seguro.
+11. Requisitos de HTTPS/TLS, proxy inverso y configuración productiva.
+12. Migraciones Alembic, backups y recuperación de base de datos.
+13. Sistema visual: tokens, tipografía, paleta, componentes y convenciones CSS.
+14. Guía responsive: breakpoints y comportamiento en móvil, tablet y escritorio.
+15. Descripción de las páginas finales y sus funcionalidades.
+16. Endpoints reales que consume cada pantalla.
+17. Estados de carga, error, vacío y acciones principales.
+18. Pruebas de seguridad, compilación y responsive realizadas con resultados reales.
+19. Limitaciones conocidas, funcionalidades pendientes y decisiones justificadas.
+
+No documentes como existente una protección o funcionalidad que no haya sido implementada y verificada.
+
+------------------------------------------------------------------------------
+13. ENTREGABLES ESPERADOS
+------------------------------------------------------------------------------
+
+A. Seguridad y backend
+1. Configuración centralizada por ambiente.
+2. `.env.example` sin secretos reales.
+3. CORS y cabeceras de seguridad ajustadas.
+4. Autenticación, sesiones, logout y refresh endurecidos.
+5. RBAC y ownership comprobados para los roles `ADMINISTRADOR` y `USUARIO`.
+6. Protección de información financiera y manejo seguro de errores/logs.
+7. Migraciones Alembic revisadas, si hubo cambios de esquema.
+8. Lista de riesgos o controles que no pudieron completarse.
+
+B. Frontend finalizado
+9. Todas las vistas de TusFinanzas completadas visual y funcionalmente.
+10. Layout de escritorio, tablet y móvil.
+11. Sidebar/menú móvil accesible.
+12. Sistema visual consistente con tokens CSS.
+13. Formularios, tablas, tarjetas, gráficos y diálogos responsive.
+14. Estados vacíos, carga, error, éxito, 403, 404 y sesión expirada.
+15. Integración con endpoints reales y contratos TypeScript.
+16. Formato coherente de moneda, fechas e importes.
+17. Corrección de errores de TypeScript, estilos y compilación detectados.
+18. Sin secretos, tokens persistidos en localStorage/sessionStorage ni mocks activos en producción.
+
+C. Documentación y evidencia
+19. `READMEv3.md` con instrucciones de backend, frontend, seguridad y diseño responsive.
+20. Relación de archivos creados, modificados o eliminados.
+21. Resultados reales de las pruebas ejecutadas.
+22. Matriz de verificación de vistas por tamaño de pantalla.
+23. Lista de limitaciones y pendientes de la siguiente fase.
+
+------------------------------------------------------------------------------
+14. FORMATO DE LA RESPUESTA FINAL
+------------------------------------------------------------------------------
+
+Al finalizar, entrega un informe con estas secciones:
+
+1. **Diagnóstico inicial:** arquitectura, seguridad y estado de las vistas.
+2. **Hardening implementado:** secretos, CORS, cookies, autenticación, autorización, OWASP y protección de datos.
+3. **Vistas finalizadas:** resumen de cada página y sus acciones funcionales.
+4. **Diseño responsive:** comportamiento en móvil, tablet y escritorio; breakpoints utilizados.
+5. **Sistema visual:** paleta, tipografía, tokens, componentes y mejoras de experiencia.
+6. **Integración API:** endpoints reales conectados y funcionalidades que dependen del backend.
+7. **Base de datos:** migraciones o cambios realizados, si los hubo.
+8. **Pruebas ejecutadas:** comandos, tamaños de pantalla, resultados y errores pendientes.
+9. **Archivos modificados:** rutas exactas y motivo de cada grupo de cambios.
+10. **Cómo ejecutar:** instrucciones para backend y frontend.
+11. **Pendientes:** riesgos, limitaciones y trabajo que debe continuar en la fase siguiente.
+
+Diferencia claramente entre:
+* Implementado y verificado.
+* Implementado pero no verificado por limitaciones del entorno.
+* Parcialmente implementado.
+* Pendiente.
+
+No afirmes que el diseño es responsive si solo fue revisado en escritorio. No afirmes que la seguridad está completa si faltan pruebas o controles. No declares producción lista sin revisar despliegue, infraestructura, backups, TLS y configuración real.
+
+------------------------------------------------------------------------------
+15. RESULTADO ESPERADO
+------------------------------------------------------------------------------
+
+Una versión de TusFinanzas con:
+* Backend endurecido y configurado de forma segura por ambiente.
+* Privacidad financiera y aislamiento de datos por usuario.
+* Autenticación y autorización coherentes con el modelo de roles.
+* API estable para el frontend.
+* Todas las vistas principales terminadas, con diseño agradable y consistente.
+* Experiencia responsive real en móvil, tablet y escritorio.
+* Formularios y controles accesibles y utilizables.
+* Gráficos e indicadores claros, basados en datos reales y sin afirmaciones engañosas.
+* Documentación técnica y visual suficiente para continuar con la fase final de pruebas manuales.
+
+La prioridad de esta fase es que TusFinanzas deje de ser solamente una base funcional y se convierta en una aplicación visualmente completa, cómoda de usar y técnicamente preparada para una validación integral, sin sacrificar la seguridad ni la precisión de la información financiera.
+
+# FIN DEL PROMPT 04 - TUSFINANZAS

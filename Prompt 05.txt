@@ -1,0 +1,886 @@
+# ============================================================================== 
+# PROMPT 5: DOCUMENTACIÓN Y VALIDACIÓN MANUAL DE APIs + PRUEBAS DE ACEPTACIÓN
+# Proyecto: Plataforma de Finanzas Personales (TusFinanzas)
+# Base de Datos: tusfinanzas_db (PostgreSQL 18)
+# Stack: FastAPI + SQLAlchemy 2.0 + Pydantic v2 + React + TypeScript + Vite
+# Alcance: ingresos netos, gastos obligatorios, deudas, gastos hormiga y ahorro
+# ============================================================================== 
+
+Actúa como **Arquitecto de APIs REST, QA funcional y Documentador Técnico Senior**, experto en FastAPI, OpenAPI/Swagger, REST, PostgreSQL, seguridad OWASP, privacidad de información financiera, React, TypeScript y pruebas manuales reproducibles.
+
+Tu misión es **crear o actualizar el archivo `README_TEST.md`** en la raíz del proyecto TusFinanzas. Este documento debe explicar, paso a paso, cómo probar manualmente las APIs del backend y cómo validar los flujos principales del frontend ya finalizado en el Prompt 04.
+
+El manual debe ser claro, reproducible, profesional y estar basado en el código REAL del proyecto. Debe servir para que otra persona pueda ejecutar las pruebas desde cero, entender los resultados esperados y registrar las incidencias encontradas.
+
+IMPORTANTE: antes de redactar el manual, inspecciona el backend, el frontend, los modelos, los esquemas Pydantic, los servicios, las rutas, las migraciones Alembic, la configuración y el contrato OpenAPI vigente. Los prompts anteriores definen la intención arquitectónica, pero el código y el OpenAPI implementados determinan el contrato final que se debe probar.
+
+------------------------------------------------------------------------------
+1. OBJETIVO GENERAL
+------------------------------------------------------------------------------
+
+Documentar y guiar la validación manual de TusFinanzas, verificando:
+
+* Registro, autenticación, renovación y cierre de sesión.
+* Protección de rutas y datos mediante roles (`ADMINISTRADOR` y `USUARIO`) y control de propiedad (*Ownership*).
+* Registro, consulta y actualización de fuentes de ingreso, ingresos recibidos y deducciones.
+* Cálculo correcto del ingreso neto mensual real.
+* Registro, categorización, consulta y actualización de gastos.
+* Diferenciación entre gastos fijos, variables y ocasionales, y entre obligatorios, necesarios variables y discrecionales.
+* Distinción entre gastos pagados, pendientes y vencidos.
+* Registro y seguimiento de deudas y de pagos asociados, cuando estén implementados.
+* Cálculo del balance de caja real y de la capacidad de ahorro estimada.
+* Detección explicable de posibles gastos hormiga, sin clasificaciones automáticas definitivas no confirmadas.
+* Privacidad de la información: un usuario no puede consultar ni modificar la información financiera de otra cuenta.
+* Integración real entre React y FastAPI.
+* Funcionamiento de todas las vistas finales y adaptación a móvil, tablet y escritorio.
+* Respuestas HTTP, validaciones, manejo de errores y consistencia de datos.
+
+Este documento se enfoca en **pruebas manuales** mediante Swagger UI, Postman/Insomnia, cURL y navegación manual del frontend. No debe incorporar suites de `pytest`, pruebas unitarias automatizadas ni código de automatización de pruebas. Puede indicar comandos normales de instalación, ejecución, migración, lint, typecheck y build que formen parte del procedimiento de verificación del proyecto, pero no convertir el manual en una guía de pruebas automatizadas.
+
+------------------------------------------------------------------------------
+2. REGLAS OBLIGATORIAS PARA ELABORAR EL MANUAL
+------------------------------------------------------------------------------
+
+Antes de crear el documento:
+
+1. Inspecciona la estructura real de `backend/` y `frontend/`.
+2. Identifica los routers registrados, sus prefijos, métodos, parámetros, dependencias y códigos HTTP.
+3. Consulta `/openapi.json` o la documentación OpenAPI generada por FastAPI.
+4. Contrasta OpenAPI con `routes.py`, `schemas.py` y `services.py` para confirmar las reglas de negocio.
+5. Inspecciona el modelo de datos y las migraciones para determinar campos, relaciones, restricciones y estados reales.
+6. Revisa cómo se implementó la autenticación: Bearer, cookies HttpOnly, refresh token, CSRF y logout. Documenta únicamente el mecanismo real.
+7. Inspecciona los servicios frontend, tipos TypeScript, rutas y componentes para determinar qué endpoints consume cada vista.
+8. No inventes endpoints, campos JSON, respuestas, usuarios, credenciales, códigos HTTP ni funcionalidades que no existan.
+9. Cuando un endpoint orientativo de este prompt no esté implementado o use otra ruta, documenta la ruta real y registra la diferencia.
+10. Si una funcionalidad no está disponible, indícala como pendiente/no implementada. No presentes una simulación como funcionalidad real.
+11. Si hay discrepancias entre documentación, código y OpenAPI, prioriza el contrato implementado y registra la discrepancia para corregirla.
+12. No uses credenciales reales ni información bancaria, financiera o personal de usuarios reales. Todas las pruebas deben emplear datos sintéticos.
+13. No afirmes que una prueba fue aprobada si no se ejecutó. Distingue entre `APROBADA`, `FALLIDA`, `NO EJECUTADA` y `NO APLICA`.
+14. Conserva los nombres de módulos, entidades, rutas y convenciones que realmente use el proyecto.
+
+Regla de precisión: los endpoints incluidos más adelante son una **lista de referencia derivada de la arquitectura prevista**. Deben verificarse en el proyecto antes de documentarlos como disponibles.
+
+------------------------------------------------------------------------------
+3. CONTEXTO FUNCIONAL DE TUSFINANZAS
+------------------------------------------------------------------------------
+
+TusFinanzas es una plataforma de finanzas personales que ayuda al usuario a:
+
+* Registrar diferentes fuentes de ingreso.
+* Registrar ingresos efectivamente recibidos y sus deducciones.
+* Conocer el ingreso neto real de un periodo.
+* Identificar gastos obligatorios, necesarios variables y discrecionales.
+* Separar gastos fijos, variables y ocasionales.
+* Registrar gastos pagados, pendientes y vencidos.
+* Controlar deudas y pagos relacionados.
+* Analizar el balance mensual y una capacidad de ahorro estimada.
+* Identificar posibles gastos hormiga a partir de frecuencia, repetición e importe acumulado.
+
+Dominios funcionales previstos:
+
+1. `auth`: registro, inicio de sesión, renovación, cierre de sesión y sesión actual.
+2. `users`: perfil, preferencias, moneda principal, estado y roles.
+3. `incomes`: fuentes de ingreso, ingresos recibidos, deducciones y netos.
+4. `expenses`: categorías y movimientos de gasto.
+5. `debts`: deudas, saldos pendientes y pagos relacionados.
+6. `financial_analysis`: resumen mensual, balance, capacidad de ahorro, recurrencias y posibles gastos hormiga.
+
+Roles previstos:
+
+* `ADMINISTRADOR`: administra aspectos técnicos, catálogos globales, estados de cuenta y funciones administrativas implementadas. **No obtiene acceso automático a los ingresos, gastos, deudas ni análisis financieros privados de los usuarios.**
+* `USUARIO`: administra y consulta exclusivamente su propia información financiera y sus preferencias.
+
+No crees roles adicionales ni supongas facultades administrativas que no estén implementadas.
+
+------------------------------------------------------------------------------
+4. HERRAMIENTAS RECOMENDADAS PARA LAS PRUEBAS
+------------------------------------------------------------------------------
+
+Documenta el uso de:
+
+A. **Swagger UI (`/docs`)**
+* Explorar los endpoints publicados por FastAPI.
+* Revisar parámetros, modelos y respuestas OpenAPI.
+* Ejecutar solicitudes mediante `Try it out`.
+* Aplicar el mecanismo `Authorize` cuando el esquema de seguridad generado lo admita.
+
+B. **Postman o Insomnia**
+* Organizar solicitudes por dominio (`auth`, `users`, `incomes`, `expenses`, `debts`, `financial_analysis`).
+* Crear un entorno local con variables como `baseUrl`, `accessToken`, `userA`, `userB` y los identificadores generados durante las pruebas.
+* No guardar contraseñas reales, tokens productivos ni datos financieros sensibles.
+* Documentar cómo manejar cookies y CSRF si el proyecto utiliza autenticación basada en cookies.
+
+C. **cURL**
+* Incluir ejemplos ejecutables para Linux/macOS y Windows PowerShell cuando existan diferencias de sintaxis.
+* Usar placeholders claros para tokens e identificadores.
+* No incluir secretos productivos ni credenciales reales.
+
+D. **Navegador web**
+* Usarlo para probar manualmente las rutas y vistas React.
+* Incluir las herramientas de desarrollador para revisar errores de consola, solicitudes de red y dimensiones de viewport.
+* No exponer datos financieros privados en capturas o evidencias compartidas.
+
+------------------------------------------------------------------------------
+5. PREPARACIÓN DEL ENTORNO
+------------------------------------------------------------------------------
+
+Documenta las instrucciones exactas según los archivos existentes del proyecto. Como mínimo, incluye:
+
+5.1. Requisitos previos
+
+* Versión de Python realmente requerida por el proyecto.
+* PostgreSQL y versión compatible; el diseño de referencia utiliza PostgreSQL 18.
+* Node.js y npm compatibles con el `package.json`.
+* Acceso a terminal y navegador actualizado.
+
+5.2. Configuración del backend
+
+* Crear y activar `venv` si el proyecto lo utiliza.
+* Instalar dependencias desde `requirements.txt`.
+* Crear `.env` local a partir de `.env.example`.
+* Configurar `DATABASE_URL` apuntando a `tusfinanzas_db`.
+* Configurar una clave JWT aleatoria, robusta y exclusiva para desarrollo.
+* Configurar `APP_ENV`, expiraciones, cookies y `APP_CORS_ORIGINS` según el código real.
+* No copiar secretos de ejemplo a producción.
+* Confirmar que `.env` esté excluido del control de versiones.
+
+5.3. Configuración de PostgreSQL
+
+* Crear la base de datos `tusfinanzas_db`.
+* Ejecutar las migraciones reales con Alembic, por ejemplo `alembic upgrade head`, si el proyecto tiene Alembic configurado.
+* Verificar que las tablas e índices esperados existan.
+* No utilizar `create_all()` como sustituto de migraciones en entornos productivos.
+* Explicar cómo revisar conexión y versión de esquema sin alterar datos ajenos.
+
+5.4. Arranque del backend
+
+Documenta el comando real utilizado. Si corresponde al diseño previsto:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Indica la URL local real del servicio, Swagger UI (`/docs`), OpenAPI (`/openapi.json`) y health check únicamente si están implementados.
+
+5.5. Configuración del frontend
+
+* Instalar dependencias en `frontend/` mediante el comando compatible con el lockfile (`npm ci` preferiblemente cuando exista `package-lock.json`, o `npm install` si corresponde).
+* Crear `.env` a partir de `.env.example`.
+* Configurar `VITE_API_BASE_URL` con la URL local real de la API; como referencia: `http://localhost:8000/api/v1`.
+* No incluir secretos ni claves privadas en variables `VITE_*`.
+* Iniciar el servidor de desarrollo con el script real de `package.json`, habitualmente `npm run dev`.
+* Documentar la URL local real que indique Vite.
+
+5.6. Datos sintéticos de prueba
+
+Preparar un procedimiento seguro para disponer, como mínimo, de:
+
+* Un usuario `ADMINISTRADOR`.
+* Dos usuarios independientes `USUARIO A` y `USUARIO B`.
+* Fuentes de ingreso para el usuario A.
+* Al menos un ingreso recibido con deducciones.
+* Gastos obligatorios pagados y pendientes.
+* Gastos variables y discrecionales.
+* Una deuda y pagos relacionados, si la funcionalidad está implementada.
+* Movimientos repetidos de importe pequeño para probar sugerencias de posibles gastos hormiga.
+
+Los datos deben ser ficticios, claramente identificados como datos de prueba y compatibles con los esquemas reales. Documenta el mecanismo de creación disponible (registro normal, comando de seed o inserción de desarrollo). No inventes un script de seed si no existe y no recomiendes insertar datos manualmente saltándose las reglas de negocio.
+
+------------------------------------------------------------------------------
+6. DESCUBRIMIENTO Y CONTRATO DE LA API
+------------------------------------------------------------------------------
+
+Antes de las pruebas funcionales, documenta:
+
+* URL base real de API y versión.
+* Prefijos aplicados a cada router.
+* Esquemas de autenticación publicados en OpenAPI.
+* Parámetros de paginación, fechas, filtros y ordenamiento realmente disponibles.
+* Formato de fechas y zona horaria esperados.
+* Representación JSON de importes monetarios (`string` decimal o formato real del proyecto).
+* Códigos de respuesta y modelos de error reales.
+
+Lista de rutas orientativas que deben contrastarse con el código. Si el nombre, método o prefijo cambia, utiliza el contrato real:
+
+| Dominio | Operación orientativa |
+|---|---|
+| Auth | `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me` |
+| Users | `GET /users/me`, `PATCH /users/me`, `PATCH /users/me/preferences` |
+| Incomes | `POST /income-sources`, `GET /income-sources`, `PATCH /income-sources/{id}`, `POST /incomes`, `GET /incomes`, `GET /incomes/{id}`, `PATCH /incomes/{id}` si existe, `POST /incomes/{id}/deductions` |
+| Expenses | `GET /expense-categories`, `POST /expense-categories` si está permitido, `PATCH /expense-categories/{id}`, `POST /expenses`, `GET /expenses`, `GET /expenses/{id}`, `PATCH /expenses/{id}`, `PATCH /expenses/{id}/payment-status` |
+| Debts | `POST /debts`, `GET /debts`, `GET /debts/{id}`, `PATCH /debts/{id}`, `GET /debts/{id}/payments` |
+| Financial analysis | `GET /financial-analysis/monthly-summary`, `GET /financial-analysis/balance`, `GET /financial-analysis/saving-capacity`, `GET /financial-analysis/recurring-expenses`, `GET /financial-analysis/ant-expenses` y operaciones de confirmar/descartar sugerencias si existen |
+
+Reglas:
+
+* No documentes una ruta orientativa como existente sin verificarla.
+* Para cada endpoint real, registra método, ruta, autenticación, rol, parámetros, body, response y códigos HTTP.
+* Si no existe una operación de pago de deuda independiente, describe el mecanismo real usado para registrar el pago; no inventes `POST /payments`.
+* Si el análisis se construye mediante una sola ruta agregada o usa nombres distintos, documenta los endpoints reales.
+* Indica claramente qué funcionalidades no se han implementado.
+
+------------------------------------------------------------------------------
+7. AUTENTICACIÓN Y AUTORIZACIÓN
+------------------------------------------------------------------------------
+
+Documenta el flujo real, con solicitudes y respuestas ajustadas a los esquemas del proyecto:
+
+7.1. Registro (`POST /auth/register` o ruta real)
+* Método, URL, headers, body exacto y respuesta.
+* Reglas de contraseña, unicidad del email y asignación de rol por defecto.
+* Confirmar que el cliente no puede autoadjudicarse `ADMINISTRADOR` ni establecer su propio `user_id`.
+
+7.2. Inicio de sesión (`POST /auth/login` o ruta real)
+* Credenciales de prueba ficticias.
+* Forma de envío aceptada (`email`, `username` u otra, según esquema real).
+* Respuesta exacta: token JSON, cookies `Set-Cookie` o mecanismo implementado.
+* Código esperado para credenciales válidas e inválidas.
+
+7.3. Uso de credenciales
+
+Si el sistema utiliza Bearer Token:
+
+```http
+Authorization: Bearer <ACCESS_TOKEN>
+```
+
+Si usa cookies HttpOnly:
+* Indica cómo conserva el navegador la cookie y cómo Postman maneja el cookie jar.
+* No instruyas a leer una cookie HttpOnly desde JavaScript.
+* Explica el envío de credenciales y el mecanismo CSRF real para operaciones mutables.
+
+7.4. Renovación (`POST /auth/refresh` o ruta real)
+* Probar renovación con sesión válida.
+* Probar token/cookie inválido, expirado o revocado.
+* Verificar rotación e invalidación del refresh token anterior si esa función está implementada.
+
+7.5. Sesión y logout
+* Consultar usuario actual (`GET /auth/me` o ruta real).
+* Cerrar sesión.
+* Intentar reutilizar las credenciales revocadas y registrar el resultado.
+* Comprobar que el frontend vuelve al acceso público y limpia datos de sesión y caché asociados al usuario.
+
+------------------------------------------------------------------------------
+8. PRUEBAS MANUALES DE API POR DOMINIO
+------------------------------------------------------------------------------
+
+Para cada endpoint real, incluir una ficha con este formato obligatorio:
+
+1. Identificador y nombre de la prueba.
+2. Objetivo de negocio.
+3. Método HTTP y URL exacta.
+4. Rol autorizado y requisitos de propiedad.
+5. Headers y autenticación.
+6. Parámetros de ruta, query y paginación.
+7. Request Body JSON exacto según Pydantic/OpenAPI.
+8. Pasos para ejecutar la solicitud con Swagger y al menos cURL o Postman.
+9. Response real esperada, usando valores sintéticos coherentes.
+10. Código HTTP esperado y explicación.
+11. Escenario negativo relacionado.
+12. Resultado que debe registrarse.
+
+No inventes propiedades JSON. Obtén los nombres y tipos exactos de los esquemas implementados. Si la documentación se redacta antes de ejecutar el endpoint, marca la respuesta como `EJEMPLO ILUSTRATIVO, PENDIENTE DE VERIFICACIÓN`.
+
+8.1. Auth (`/auth`)
+
+Documentar las pruebas disponibles para:
+
+* Registro de un nuevo usuario.
+* Rechazo de email duplicado.
+* Validación de contraseñas no permitidas.
+* Inicio de sesión correcto.
+* Rechazo de credenciales incorrectas.
+* Obtención del usuario autenticado.
+* Renovación de sesión.
+* Logout e invalidación de sesión.
+
+8.2. Users (`/users`)
+
+* Consultar perfil propio.
+* Actualizar datos permitidos.
+* Actualizar preferencias admitidas, incluida moneda principal ISO 4217 si está soportada.
+* Rechazar asignación no autorizada de rol, estado o propietario desde el body.
+* Comprobar que un usuario no pueda consultar ni modificar el perfil privado de otro mediante identificadores manipulados.
+* Confirmar que un administrador solo accede a los datos administrativos permitidos y no a movimientos financieros privados por defecto.
+
+8.3. Incomes (`/incomes`)
+
+Probar las operaciones implementadas para:
+
+* Crear una fuente de ingreso.
+* Listar y consultar fuentes propias.
+* Actualizar o desactivar una fuente.
+* Registrar un ingreso efectivamente recibido.
+* Consultar ingresos por periodo y fuente.
+* Registrar deducciones del ingreso.
+* Consultar el neto calculado.
+* Rechazar deducciones cuya suma supere el ingreso bruto.
+* Impedir asociar una fuente o ingreso perteneciente a otro usuario.
+* Distinguir ingreso recibido de monto estimado o de referencia.
+
+Validación de negocio obligatoria:
+
+`monto_neto = monto_bruto - suma_deducciones`
+
+El ingreso neto mensual real debe sumar únicamente ingresos netos efectivamente recibidos dentro del periodo consultado. Las fuentes estimadas no deben contarse como dinero recibido.
+
+8.4. Expenses (`/expenses`)
+
+Probar:
+
+* Consultar categorías globales y privadas.
+* Crear una categoría privada cuando la API lo permita.
+* Actualizar categoría propia sin modificar categorías privadas ajenas ni catálogos protegidos.
+* Registrar un gasto con categoría, fecha, importe y clasificación admitida.
+* Listar y consultar gastos propios.
+* Actualizar un gasto dentro de las reglas de negocio.
+* Cambiar el estado de pago cuando exista endpoint para ello.
+* Filtrar por fecha, mes, categoría, naturaleza o estado cuando esté soportado.
+* Verificar que gastos `PAGADO`, `PENDIENTE` y `VENCIDO` se presentan de forma distinta.
+* Verificar que la recurrencia no genere movimientos duplicados.
+
+Comprobar que se distingan dos dimensiones:
+
+* Naturaleza/periodicidad: `FIJO`, `VARIABLE`, `OCASIONAL`.
+* Nivel de necesidad: `OBLIGATORIO`, `NECESARIO_VARIABLE`, `DISCRECIONAL`.
+
+No tratar estas clasificaciones como equivalentes. Validar que los gastos obligatorios, por ejemplo vivienda/arriendo y servicios públicos, puedan representarse de acuerdo con el catálogo real.
+
+8.5. Debts (`/debts`)
+
+Probar las operaciones implementadas para:
+
+* Crear una deuda propia.
+* Listar y consultar deudas.
+* Actualizar datos permitidos.
+* Consultar pagos o movimientos asociados.
+* Registrar un pago por el mecanismo real del proyecto.
+* Comprobar la actualización del saldo pendiente solo cuando el pago quede confirmado.
+* Comprobar que un mismo pago no se descuente dos veces al repetir la solicitud o cambiar su estado.
+* Rechazar pagos incompatibles con el saldo pendiente según las reglas implementadas.
+* Impedir consultar o modificar deudas de otro usuario.
+
+Si el sistema no separa capital, intereses y otros cargos, no inventes esa desagregación en las pruebas.
+
+8.6. Financial analysis (`/financial-analysis` o prefijo real)
+
+Probar los endpoints reales para:
+
+* Resumen mensual.
+* Ingreso neto real del periodo.
+* Gastos efectivamente pagados.
+* Gastos pendientes y vencidos presentados por separado.
+* Balance de caja real.
+* Balance proyectado, si está disponible.
+* Capacidad de ahorro estimada.
+* Gastos recurrentes.
+* Posibles gastos hormiga.
+* Confirmación, descarte o reclasificación de sugerencias, únicamente si la API lo soporta.
+
+Fórmulas y reglas que deben comprobarse:
+
+A. Ingreso neto recibido:
+
+`Ingreso neto = ingreso bruto - suma de deducciones asociadas`.
+
+B. Balance de caja real:
+
+`Balance real = ingresos netos efectivamente recibidos - gastos efectivamente pagados`.
+
+C. Gastos pendientes:
+
+Deben mostrarse separadamente y no restarse del balance de caja real hasta su pago confirmado. Pueden participar en una proyección si el backend lo define y explica.
+
+D. Capacidad de ahorro:
+
+Debe mostrarse como una estimación explicable, basada en los datos y periodo disponibles. No debe presentarse como dinero garantizado ni confundirse con saldo bancario real.
+
+E. Posibles gastos hormiga:
+
+Comprobar que una sugerencia incluya las razones disponibles (frecuencia, repetición, periodo, categoría/comercio e importe acumulado). No aceptar como válida una clasificación basada exclusivamente en un umbral fijo universal. Confirmar que la sugerencia no cambie definitivamente la categoría del gasto sin confirmación del usuario.
+
+------------------------------------------------------------------------------
+9. ESCENARIO INTEGRAL DE PRUEBA FINANCIERA
+------------------------------------------------------------------------------
+
+Diseña un escenario manual reproducible con datos sintéticos para un único usuario y una moneda principal. Utiliza importes de ejemplo en COP solo si la moneda configurada para la cuenta de prueba es COP; en otro caso, usa la moneda seleccionada y documenta el código ISO 4217.
+
+El escenario debe incluir:
+
+1. Crear una fuente de ingreso (por ejemplo, salario).
+2. Registrar un ingreso bruto recibido.
+3. Registrar una o más deducciones válidas.
+4. Consultar el ingreso neto resultante.
+5. Registrar varios gastos: vivienda/arriendo, servicios públicos, alimentación, transporte y al menos un gasto discrecional.
+6. Registrar movimientos de gasto con estados pagado y pendiente.
+7. Crear una deuda y registrar un pago por el flujo real implementado.
+8. Repetir una solicitud de pago de forma controlada para comprobar que no se descuente dos veces.
+9. Registrar varios importes pequeños y recurrentes para evaluar sugerencias de posibles gastos hormiga.
+10. Consultar el resumen y el balance mensual.
+11. Consultar capacidad de ahorro estimada.
+12. Consultar sugerencias de gastos hormiga y comprobar su explicación.
+13. Comparar resultados de la API con cálculos manuales independientes.
+
+En el README_TEST.md, incluir una tabla con:
+
+* Registro creado.
+* Importe y moneda.
+* Fecha/periodo.
+* Estado.
+* Resultado calculado esperado.
+* Endpoint que permite verificarlo.
+
+Los valores deben ser internamente coherentes y los resultados aritméticos deben calcularse antes de incluirse. No uses `float` para verificar importes monetarios; utiliza aritmética decimal o una calculadora decimal confiable. Explica cualquier redondeo aplicado.
+
+No confundas el balance real con la proyección. El importe de un gasto pendiente no debe restarse como si ya hubiese salido de caja.
+
+------------------------------------------------------------------------------
+10. VALIDACIÓN DE ROLES, PRIVACIDAD Y OWNERSHIP
+------------------------------------------------------------------------------
+
+Documenta escenarios reproducibles con dos usuarios distintos (`USUARIO A`, `USUARIO B`) y un administrador:
+
+A. Pruebas RBAC
+
+* Solicitar con token ausente una ruta protegida -> `401 Unauthorized` o respuesta equivalente definida por el proyecto.
+* Intentar usar una ruta administrativa con rol `USUARIO` -> `403 Forbidden` cuando la ruta requiera ese permiso.
+* Manipular `role`, `user_id` o propietario en el body -> el backend debe ignorar o rechazar el campo según el esquema y nunca confiar en él.
+* Un usuario no debe poder asignarse el rol `ADMINISTRADOR`.
+
+B. Pruebas Ownership
+
+* Usuario A intenta consultar el ingreso de Usuario B.
+* Usuario A intenta editar o eliminar el gasto de Usuario B.
+* Usuario A intenta consultar o modificar la deuda de Usuario B.
+* Usuario A intenta acceder a categorías privadas de Usuario B.
+* Usuario A intenta asociar un ingreso a una fuente de ingreso perteneciente a Usuario B.
+* Usuario A intenta registrar un gasto contra una deuda de Usuario B.
+* Usuario B intenta acceder a los resúmenes privados de Usuario A.
+* Administrador intenta consultar movimientos financieros privados sin una autorización específica y auditada.
+
+El resultado debe impedir la exposición de datos ajenos. Según el contrato y la política de existencia del recurso, la respuesta puede ser `403` o `404`; el manual debe registrar el comportamiento real y verificar que no exista filtración de información.
+
+C. Comprobación de aislamiento de sesión
+
+* Iniciar sesión como Usuario A y abrir Dashboard, Ingresos, Gastos, Deudas y Análisis.
+* Cerrar sesión e iniciar como Usuario B en el mismo navegador.
+* Comprobar que ninguna tarjeta, tabla, gráfico, filtro, estado o respuesta cacheada de Usuario A permanezca visible.
+* Repetir recargando cada ruta privada y usando atrás/adelante del navegador.
+
+------------------------------------------------------------------------------
+11. VALIDACIÓN DE ERRORES Y REGLAS DE NEGOCIO
+------------------------------------------------------------------------------
+
+Incluir ejemplos reales (obtenidos del handler del proyecto) para cada error aplicable:
+
+| Código | Caso que se debe probar |
+|---|---|
+| `200 OK` | Consulta o actualización exitosa según contrato |
+| `201 Created` | Registro creado |
+| `204 No Content` | Operación sin cuerpo, si se utiliza |
+| `400 Bad Request` | Regla de negocio incumplida, si el proyecto usa este código |
+| `401 Unauthorized` | Token ausente, inválido, vencido o credenciales incorrectas |
+| `403 Forbidden` | Rol insuficiente o acceso denegado |
+| `404 Not Found` | Recurso inexistente o no visible según política |
+| `409 Conflict` | Duplicidad, conflicto de estado o operación repetida, si corresponde |
+| `422 Unprocessable Entity` | Error de validación de Pydantic |
+| `500 Internal Server Error` | Error inesperado sin exposición de stack trace al cliente |
+
+Casos de validación financiera:
+
+* Importe negativo o cero donde no esté permitido.
+* Número con precisión decimal superior a la admitida.
+* Código de moneda inválido.
+* Fecha con formato incorrecto o periodo inconsistente.
+* Deducciones superiores al ingreso bruto.
+* Saldo pendiente negativo o mayor que el saldo inicial, cuando esa regla aplique.
+* Categoría inexistente o privada de otro usuario.
+* Fuente de ingreso no perteneciente al usuario.
+* Cambio de estado de pago no permitido.
+* Pago duplicado o doble actualización del saldo de deuda.
+* Consulta de periodo sin datos.
+* Reintento tras error de red o timeout.
+* Filtros y paginación con valores inválidos.
+
+Cada ejemplo debe mostrar request, respuesta real esperada y explicación. Nunca expongas detalles internos de base de datos, rutas del servidor, secretos o trazas completas.
+
+------------------------------------------------------------------------------
+12. PRUEBAS MANUALES DE LAS VISTAS DEL FRONTEND
+------------------------------------------------------------------------------
+
+El Prompt 04 exige finalizar las vistas. Este manual debe comprobar manualmente que cada pantalla esté conectada a datos reales y permita completar su flujo principal.
+
+Rutas de referencia que deben verificarse contra React Router:
+
+* `/login`
+* `/register`
+* `/dashboard`
+* `/incomes`
+* `/expenses`
+* `/debts`
+* `/analysis`
+* `/profile`
+* Ruta no encontrada (404), acceso denegado (403) y sesión expirada.
+
+Para cada vista, documenta: precondiciones, pasos, endpoint consumido, datos de prueba, resultado visual esperado, resultado funcional esperado y resultado obtenido.
+
+12.1. Login y registro
+
+* Verificar campos, etiquetas, validaciones y mensajes de error.
+* Registrar una cuenta de prueba si el endpoint está disponible.
+* Iniciar sesión con credenciales válidas e inválidas.
+* Confirmar redirección correcta.
+* Verificar que las rutas privadas no se muestren a usuarios no autenticados.
+* Comprobar que no se expongan tokens en `localStorage` o `sessionStorage`.
+
+12.2. Dashboard (`/dashboard`)
+
+* Comprobar carga de indicadores y periodo seleccionado.
+* Verificar que el ingreso neto corresponda a los registros recibidos.
+* Verificar que gastos pagados y pendientes se presenten por separado.
+* Comprobar el balance real y, si existe, la proyección claramente diferenciada.
+* Verificar que los gráficos y tarjetas utilicen los mismos datos que los endpoints.
+* Probar escenario sin movimientos y mensajes de orientación.
+
+12.3. Ingresos (`/incomes`)
+
+* Crear una fuente de ingreso y consultar su aparición en el listado.
+* Registrar un ingreso con deducciones.
+* Confirmar que se presenta el monto bruto, las deducciones y el neto.
+* Editar o desactivar según la funcionalidad real.
+* Probar filtros de periodo y estados vacíos.
+
+12.4. Gastos (`/expenses`)
+
+* Crear gastos obligatorios, necesarios variables y discrecionales.
+* Comprobar la independencia entre clasificación por necesidad y periodicidad.
+* Modificar los datos permitidos y el estado de pago.
+* Comprobar filtros por periodo, categoría y estado.
+* Verificar etiquetas textuales para pagado, pendiente y vencido.
+* Comprobar sugerencias de posibles gastos hormiga cuando existan.
+
+12.5. Deudas (`/debts`)
+
+* Crear una deuda.
+* Revisar saldo inicial, saldo pendiente, estado y vencimiento.
+* Registrar pago por el flujo real disponible.
+* Verificar actualización del saldo sin doble descuento.
+* Consultar el historial o detalle de pagos si está implementado.
+
+12.6. Análisis (`/analysis`)
+
+* Cambiar mes y año.
+* Comparar ingreso neto recibido con gastos pagados.
+* Consultar compromisos pendientes y proyecciones por separado.
+* Verificar gráficos por categoría y evolución temporal.
+* Revisar explicación de capacidad de ahorro y supuestos.
+* Revisar posibles gastos hormiga, su acumulado y razones.
+* Comprobar el estado cuando el historial sea insuficiente.
+
+12.7. Perfil (`/profile`)
+
+* Consultar y actualizar datos permitidos.
+* Cambiar moneda principal solo si el sistema lo soporta.
+* Verificar persistencia de preferencias.
+* Probar cambio de contraseña si está implementado.
+* Probar logout y estado de sesión.
+
+12.8. Estados auxiliares
+
+* 403: mensaje comprensible y opción de regresar.
+* 404: ruta inexistente con navegación útil.
+* Sesión expirada: aviso y redirección al login.
+* Error de conexión: mensaje no técnico y opción de reintentar.
+* Listados vacíos: explicación y acción principal.
+* Formularios inválidos: errores asociados a los campos.
+* Cargas prolongadas: indicador visible sin bloquear toda la aplicación innecesariamente.
+
+------------------------------------------------------------------------------
+13. VALIDACIÓN RESPONSIVE, ACCESIBILIDAD Y EXPERIENCIA VISUAL
+------------------------------------------------------------------------------
+
+Realiza pruebas manuales de todas las vistas relevantes en estas anchuras representativas:
+
+| Dispositivo/escenario | Ancho de viewport |
+|---|---:|
+| Móvil pequeño | 320–360 px |
+| Móvil habitual | 375–430 px |
+| Tablet | 768 px |
+| Portátil | 1024–1280 px |
+| Escritorio amplio | 1440 px o más |
+
+Verifica en login, registro, dashboard, ingresos, gastos, deudas, análisis y perfil:
+
+* No existe scroll horizontal global ni contenido cortado.
+* Sidebar y navegación se convierten en menú móvil funcional cuando corresponde.
+* Header, contenido principal y acciones mantienen jerarquía visual.
+* Tarjetas se reorganizan en columnas adecuadas.
+* Tablas usan una solución legible: transformación a tarjetas o scroll horizontal contenido y señalizado.
+* Formularios de varias columnas pasan a una columna en pantallas estrechas.
+* Gráficos redimensionan leyendas, ejes, etiquetas y tooltips.
+* Importes largos, nombres de categorías y textos no rompen el diseño.
+* Los modales caben en viewport pequeño y permiten scroll interno.
+* Los botones y campos son cómodos para interacción táctil.
+* Menú abierto no deja desplazarse accidentalmente por el fondo.
+* No hay elementos fijos que tapen campos o acciones.
+* El zoom del navegador no rompe la composición.
+* Se comprueba orientación vertical y horizontal cuando aplique.
+
+Accesibilidad básica:
+
+* Navegación completa con teclado.
+* Indicador de foco visible.
+* Etiquetas asociadas a campos.
+* Nombres accesibles para botones de solo icono.
+* Contraste suficiente.
+* Estados no comunicados exclusivamente mediante color.
+* Orden lógico de encabezados.
+* Mensajes de validación legibles y asociados al campo.
+* Respeto a `prefers-reduced-motion`.
+
+Incluye una matriz de resultados por página y viewport. No marques responsive como aprobado si solo se revisó el Dashboard o una captura de escritorio.
+
+------------------------------------------------------------------------------
+14. USO DE SWAGGER UI, POSTMAN Y cURL
+------------------------------------------------------------------------------
+
+14.1. Swagger UI
+
+* Abrir `http://localhost:8000/docs` o la URL real.
+* Localizar cada grupo de rutas.
+* Revisar esquema de seguridad y modelos.
+* Utilizar `Authorize` según Bearer o el mecanismo real.
+* Ejecutar primero consultas de lectura y luego operaciones mutables con datos sintéticos.
+* Revisar body, headers, status code y response.
+* Documentar endpoints que no estén publicados o no tengan contrato claro.
+
+14.2. Postman/Insomnia
+
+Proponer organización de colección:
+
+```text
+TusFinanzas - Pruebas manuales
+ ├── 01 - Auth
+ ├── 02 - Users
+ ├── 03 - Incomes
+ ├── 04 - Expenses
+ ├── 05 - Debts
+ ├── 06 - Financial Analysis
+ ├── 07 - RBAC y Ownership
+ └── 08 - Errores y validaciones
+```
+
+Variables orientativas:
+
+* `baseUrl`
+* `accessToken`
+* `userAId`
+* `userBId`
+* `incomeId`
+* `incomeSourceId`
+* `expenseId`
+* `debtId`
+* `periodYear`
+* `periodMonth`
+
+Documenta su asignación manual o el mecanismo seguro que esté disponible. No guardes tokens en colecciones compartidas.
+
+14.3. cURL
+
+Incluye ejemplos ejecutables con:
+
+* Registro o login.
+* Consulta autenticada del perfil.
+* Creación y consulta de ingreso.
+* Registro y consulta de gasto.
+* Consulta de deuda.
+* Consulta de resumen financiero.
+* Caso de token ausente o inválido.
+
+Los ejemplos deben reflejar rutas y esquemas reales. Usa variables de shell o placeholders; no escribas credenciales reales.
+
+------------------------------------------------------------------------------
+15. CHECKLIST MAESTRO DE VALIDACIÓN
+------------------------------------------------------------------------------
+
+Crear un checklist que permita marcar el estado de cada caso:
+
+A. Entorno
+
+* [ ] PostgreSQL disponible y base `tusfinanzas_db` creada.
+* [ ] Migraciones aplicadas correctamente.
+* [ ] Backend inicia sin errores.
+* [ ] Frontend inicia sin errores.
+* [ ] `.env` y variables del entorno configuradas sin secretos expuestos.
+* [ ] Swagger/OpenAPI accesible.
+
+B. Autenticación y privacidad
+
+* [ ] Registro validado.
+* [ ] Login válido e inválido probados.
+* [ ] Refresh probado.
+* [ ] Logout e invalidación comprobados.
+* [ ] Rutas protegidas sin token rechazadas.
+* [ ] Usuario A no consulta ni modifica datos de Usuario B.
+* [ ] Administrador no accede por defecto a movimientos privados.
+* [ ] No se exponen hashes, tokens ni secretos.
+
+C. Ingresos
+
+* [ ] Fuentes de ingreso probadas.
+* [ ] Registro de ingreso recibido probado.
+* [ ] Deducciones probadas.
+* [ ] Cálculo neto contrastado manualmente.
+* [ ] Ingresos estimados no se mezclan con ingresos reales.
+
+D. Gastos
+
+* [ ] Categorías globales y privadas probadas.
+* [ ] Registro y consulta de gastos probados.
+* [ ] Clasificación por periodicidad y necesidad diferenciada.
+* [ ] Estados pagado, pendiente y vencido probados.
+* [ ] Filtros y recurrencia probados.
+
+E. Deudas y análisis
+
+* [ ] Creación y consulta de deuda probadas.
+* [ ] Pago y actualización de saldo probados.
+* [ ] No existe doble descuento en pagos repetidos.
+* [ ] Balance real contrastado manualmente.
+* [ ] Pendientes separados del balance real.
+* [ ] Capacidad de ahorro presentada como estimación.
+* [ ] Sugerencias de gastos hormiga explicables y no impuestas.
+
+F. Frontend
+
+* [ ] Login y registro.
+* [ ] Dashboard.
+* [ ] Ingresos.
+* [ ] Gastos.
+* [ ] Deudas.
+* [ ] Análisis.
+* [ ] Perfil.
+* [ ] Estados 403, 404, sesión expirada, carga, error y vacío.
+* [ ] Cambio entre Usuario A y Usuario B sin fuga de datos en pantalla o caché.
+* [ ] Formularios, filtros, botones y navegación funcionales.
+
+G. Responsive y accesibilidad
+
+* [ ] Móvil 320–360 px.
+* [ ] Móvil 375–430 px.
+* [ ] Tablet 768 px.
+* [ ] Portátil 1024–1280 px.
+* [ ] Escritorio 1440 px o más.
+* [ ] Sin desbordamientos horizontales.
+* [ ] Navegación por teclado y foco visible.
+* [ ] Contraste, etiquetas y nombres accesibles revisados.
+
+------------------------------------------------------------------------------
+16. FORMATO DEL INFORME DE RESULTADOS
+------------------------------------------------------------------------------
+
+El `README_TEST.md` debe incluir al inicio:
+
+* Fecha de ejecución de las pruebas.
+* Versión/commit del proyecto si está disponible.
+* Entorno usado (local/desarrollo/staging; nunca credenciales).
+* Versiones reales de Python, PostgreSQL, Node y navegador.
+* Responsable de ejecución, si corresponde.
+* URL base de API y frontend sin datos privados.
+
+Por cada prueba, registra:
+
+| Campo | Contenido |
+|---|---|
+| ID | Identificador único de prueba |
+| Módulo | Dominio o vista |
+| Escenario | Acción probada |
+| Precondiciones | Datos y sesión necesarios |
+| Pasos | Secuencia manual |
+| Resultado esperado | Comportamiento correcto |
+| Resultado obtenido | Evidencia observada |
+| Estado | APROBADA / FALLIDA / NO EJECUTADA / NO APLICA |
+| Observaciones | Error, limitación o incidencia |
+
+Incluir un resumen de cobertura:
+
+* Total de pruebas documentadas.
+* Pruebas ejecutadas.
+* Aprobadas.
+* Fallidas.
+* No ejecutadas.
+* No aplicables.
+* Incidencias críticas y pendientes.
+
+Si no se ejecutaron las pruebas, entrega los procedimientos listos para ejecutar y marca los resultados como `NO EJECUTADA`. No inventes porcentajes de cobertura ni declares que el sistema está 100% validado.
+
+------------------------------------------------------------------------------
+17. ESTRUCTURA OBLIGATORIA DEL README_TEST.md
+------------------------------------------------------------------------------
+
+El archivo final debe organizarse así:
+
+1. Introducción y propósito.
+2. Alcance funcional y técnico.
+3. Arquitectura y módulos de TusFinanzas.
+4. Herramientas de pruebas manuales.
+5. Requisitos y preparación del entorno.
+6. Configuración de base de datos y datos sintéticos.
+7. Arranque de backend y frontend.
+8. Descubrimiento del contrato OpenAPI.
+9. Autenticación y manejo de sesión.
+10. Pruebas de API por dominio.
+11. Escenario integral financiero con cálculos manuales.
+12. Pruebas RBAC, privacidad y Ownership.
+13. Errores y validaciones de negocio.
+14. Pruebas manuales de las vistas React.
+15. Matriz responsive y accesibilidad.
+16. Guía Swagger UI.
+17. Guía Postman/Insomnia.
+18. Ejemplos cURL.
+19. Checklist maestro.
+20. Registro de resultados, incidencias y limitaciones.
+21. Conclusiones.
+
+------------------------------------------------------------------------------
+18. REGLAS DE REDACCIÓN Y RESULTADO ESPERADO
+------------------------------------------------------------------------------
+
+* Utiliza español técnico claro, profesional y consistente con los prompts 01–04.
+* Incluye tablas, ejemplos JSON, comandos y capturas solo cuando existan y aporten evidencia.
+* Los ejemplos deben ser reproducibles y compatibles con los esquemas implementados.
+* No incluyas `pytest`, pruebas unitarias ni suites automatizadas.
+* No uses datos reales de usuarios, cuentas bancarias o movimientos privados.
+* No expongas secretos, tokens, contraseñas ni datos personales en el README.
+* No cambies la arquitectura para adaptar el manual; documenta la implementación real y registra desviaciones.
+* No afirmes que un endpoint o una pantalla funciona sin verificarlo.
+* Distingue claramente los datos recibidos, estimados, pagados y pendientes.
+* No presentes la capacidad de ahorro como dinero garantizado.
+* No clasifiques definitivamente un gasto como innecesario sin confirmación del usuario.
+* Utiliza `Decimal` o cálculos decimales exactos al contrastar cantidades monetarias.
+* No sumes monedas distintas ni mezcles periodos diferentes sin conversión y reglas explícitas.
+* Verifica que el administrador no acceda automáticamente a los movimientos financieros privados de usuarios.
+
+ENTREGABLE PRINCIPAL:
+
+Un archivo **`README_TEST.md`** completo y profesional, guardado en la raíz del repositorio de TusFinanzas, que permita probar manualmente desde el inicio hasta el final las APIs y las vistas principales de la aplicación.
+
+ENTREGABLES COMPLEMENTARIOS:
+
+1. Colección de Postman/Insomnia solo si se solicita expresamente o si ya existe en el proyecto; no reemplazar el manual por la colección.
+2. Listado de endpoints reales y estado de implementación.
+3. Matriz de pruebas RBAC/Ownership.
+4. Matriz de pruebas visuales responsive.
+5. Resumen de incidencias y pendientes.
+
+Al finalizar, responde con:
+
+1. Ruta exacta donde guardaste `README_TEST.md`.
+2. Resumen de dominios y pantallas documentados.
+3. Endpoints que no existen o difieren de los orientativos.
+4. Pruebas ejecutadas y resultados reales; separa las no ejecutadas.
+5. Problemas detectados y recomendaciones concretas.
+
+No declares el backend o frontend listo para producción únicamente por haber redactado el manual. La conclusión debe depender de la evidencia disponible.
+
+# FIN DEL PROMPT 05 - TUSFINANZAS

@@ -1,0 +1,825 @@
+# ==============================================================================
+# PROMPT 3: FINALIZACIÓN, HARDENING Y DOCUMENTACIÓN DEL BACKEND + BASE DEL FRONTEND
+# Proyecto: Plataforma de Finanzas Personales (TusFinanzas)
+# Base de Datos: tusfinanzas_db (PostgreSQL 18)
+# Stack: FastAPI + SQLAlchemy 2.0 + Pydantic v2 + React + TypeScript + Vite
+# ===============================================================================
+
+Actúa como Arquitecto de Software Senior, Backend Lead y Frontend Lead, con experiencia en FastAPI, PostgreSQL 18, SQLAlchemy 2.0, Pydantic v2, React, TypeScript, Vite, Clean Architecture, principios SOLID, seguridad OWASP y aplicaciones de finanzas personales.
+
+Tu objetivo es completar, revisar, refactorizar, asegurar y documentar el backend de TusFinanzas, y construir una BASE FUNCIONAL DEL FRONTEND que permita comenzar a utilizar e integrar la aplicación. No debes limitarte a crear una maqueta estática: debes entregar la estructura real del frontend, navegación, autenticación, componentes compartidos, páginas iniciales, formularios y conexión con los endpoints existentes del backend.
+
+Este prompt continúa las fases definidas en el PROMPT 01 y el PROMPT 02 de TusFinanzas. Ambos documentos son la referencia funcional y arquitectónica principal. Debes mantener la continuidad con ellos y no introducir cambios incompatibles sin explicarlos y justificarlos.
+
+------------------------------------------------------------------------------
+0. CONTEXTO Y REGLAS DE CONTINUIDAD ENTRE FASES
+------------------------------------------------------------------------------
+
+TusFinanzas es una aplicación de finanzas personales que permite a cada usuario:
+* Registrar fuentes de ingresos y movimientos de dinero efectivamente recibidos.
+* Registrar las deducciones de cada ingreso y calcular el ingreso neto.
+* Consultar el ingreso neto real de un mes y distinguirlo de proyecciones.
+* Registrar gastos obligatorios, necesarios variables y discrecionales.
+* Organizar gastos por categorías, fechas, periodicidad y estado de pago.
+* Registrar deudas y asociar los pagos correspondientes.
+* Identificar patrones de gastos pequeños y frecuentes que podrían representar gastos hormiga.
+* Consultar balances mensuales y una estimación descriptiva de la capacidad de ahorro.
+
+Reglas que debes respetar:
+1. Antes de cambiar código, inspecciona el repositorio completo y los documentos disponibles, especialmente los resultados de los Prompts 01 y 02.
+2. Mantén como referencia la base de datos `tusfinanzas_db`, PostgreSQL 18 y el modelo inicial de nueve entidades: `usuarios`, `roles`, `usuario_roles`, `fuentes_ingreso`, `ingresos`, `deducciones_ingreso`, `categorias_gasto`, `deudas` y `gastos`.
+3. No inventes tablas, columnas, endpoints o relaciones como si ya existieran. Verifica el código y el esquema reales antes de afirmar que algo está implementado.
+4. No reemplaces archivos completos de forma innecesaria. Conserva el código válido y refactoriza por cambios pequeños, trazables y justificados.
+5. Si detectas una contradicción entre el repositorio y los Prompts 01/02, explica el conflicto, identifica los archivos afectados y propone la solución de menor riesgo antes de aplicarla.
+6. Si falta información, formula supuestos explícitos. No inventes reglas tributarias, tasas legales, porcentajes de deducción ni criterios universales para definir qué gasto es innecesario.
+7. No presentes TusFinanzas como asesor financiero profesional. La aplicación registra, organiza y analiza información aportada por el usuario; no debe emitir recomendaciones personalizadas de inversión, crédito, endeudamiento o tributación.
+8. No declares que el proyecto está listo para producción o 100% funcional si no has ejecutado y documentado las verificaciones correspondientes.
+
+------------------------------------------------------------------------------
+1. OBJETIVO GENERAL
+------------------------------------------------------------------------------
+
+Completar y validar el backend profesional de TusFinanzas y construir una base funcional del frontend, garantizando:
+
+* Seguridad y privacidad de datos financieros, aplicando controles relevantes de OWASP.
+* Autenticación, autorización y aislamiento de información por usuario.
+* Arquitectura modular y mantenible basada en Clean Architecture y principios SOLID.
+* Integridad de las operaciones monetarias utilizando `Decimal` en Python y `NUMERIC`/`DECIMAL` en PostgreSQL.
+* Contratos REST/JSON consistentes y documentados mediante OpenAPI.
+* Frontend React + TypeScript con estructura escalable, navegación, autenticación y pantallas base para los dominios financieros.
+* Integración real entre frontend y backend, sin depender de datos simulados para aparentar funcionalidades terminadas.
+* Documentación suficiente para ejecutar el proyecto localmente y continuar con futuras fases.
+
+El resultado debe ser una base técnica coherente que permita iniciar sesión, navegar por la aplicación, registrar y consultar información financiera según los endpoints implementados y visualizar los principales indicadores mensuales.
+
+------------------------------------------------------------------------------
+2. DIAGNÓSTICO Y PLAN DE TRABAJO OBLIGATORIOS
+------------------------------------------------------------------------------
+
+Antes de modificar o generar archivos:
+
+1. Inspecciona la estructura completa del proyecto y determina si backend y frontend ya existen.
+2. Revisa los modelos ORM, esquemas Pydantic, servicios, rutas, configuración, autenticación, scripts SQL y migraciones disponibles.
+3. Identifica los endpoints realmente implementados y contrástalos con los casos de uso del Prompt 01 y el Prompt 02.
+4. Revisa si las nueve entidades de referencia están implementadas y si sus relaciones, claves foráneas, restricciones e índices son coherentes.
+5. Revisa la configuración de CORS, manejo de sesiones, cookies, JWT, permisos y validación de propiedad de los registros.
+6. Si ya existe un frontend, analiza sus dependencias, estructura, estilos, componentes y convenciones antes de introducir cambios. Conserva las decisiones visuales y técnicas que sean compatibles.
+7. Identifica dependencias desactualizadas, vulnerabilidades conocidas o incompatibilidades de versiones. No actualices todo indiscriminadamente.
+8. Presenta un diagnóstico inicial breve que incluya:
+   * Elementos correctos que deben conservarse.
+   * Problemas críticos de funcionamiento, arquitectura o seguridad.
+   * Módulos pendientes o incompletos.
+   * Cambios que se realizarán en backend.
+   * Elementos que se crearán o modificarán en frontend.
+   * Riesgos y supuestos relevantes.
+
+Después del diagnóstico, procede con la implementación ordenada. No te detengas únicamente en recomendaciones: completa el trabajo solicitado dentro del alcance y documenta cualquier limitación real.
+
+------------------------------------------------------------------------------
+3. ARQUITECTURA OBJETIVO Y ESTRUCTURA DEL PROYECTO
+------------------------------------------------------------------------------
+
+La solución debe respetar la separación por capas y dominios:
+
+Frontend (React + TypeScript + Vite)
+        |
+        v
+API / Controllers (FastAPI - rutas HTTP)
+        |
+        v
+Service Layer (reglas financieras y casos de uso)
+        |
+        v
+Persistence Layer (SQLAlchemy 2.0)
+        |
+        v
+PostgreSQL 18 (`tusfinanzas_db`)
+
+Cada capa debe cumplir responsabilidades claras, evitar dependencias circulares y aplicar SRP, DRY y separación de responsabilidades.
+
+Estructura objetivo orientativa:
+
+```text
+TusFinanzas/
+|
+|-- backend/
+|   |-- app/
+|   |   |-- auth/
+|   |   |-- users/
+|   |   |-- incomes/
+|   |   |-- expenses/
+|   |   |-- debts/
+|   |   |-- financial_analysis/
+|   |   |-- core/
+|   |   |-- main.py
+|   |-- alembic/
+|   |-- alembic.ini
+|   |-- requirements.txt
+|   |-- .env.example
+|   `-- README.md
+|
+|-- frontend/
+|   |-- public/
+|   |-- src/
+|   |   |-- app/
+|   |   |-- api/
+|   |   |-- auth/
+|   |   |-- components/
+|   |   |-- features/
+|   |   |   |-- dashboard/
+|   |   |   |-- incomes/
+|   |   |   |-- expenses/
+|   |   |   |-- debts/
+|   |   |   `-- financial-analysis/
+|   |   |-- hooks/
+|   |   |-- layouts/
+|   |   |-- pages/
+|   |   |-- routes/
+|   |   |-- styles/
+|   |   |-- types/
+|   |   |-- utils/
+|   |   `-- main.tsx
+|   |-- index.html
+|   |-- package.json
+|   |-- tsconfig.json
+|   |-- vite.config.ts
+|   |-- .env.example
+|   `-- README.md
+|
+|-- README.md
+`-- .gitignore
+```
+
+La estructura es una guía, no una obligación de duplicar carpetas que ya existan. Ajusta los nombres según el repositorio real, conservando la separación por dominios.
+
+3.1. Backend
+
+Cada dominio con persistencia debe separar, según corresponda:
+* `models.py`: modelos ORM de SQLAlchemy 2.0.
+* `schemas.py`: esquemas Pydantic v2 para entrada y salida.
+* `services.py`: reglas de negocio, cálculos y transacciones.
+* `routes.py`: endpoints REST y dependencias FastAPI.
+
+El módulo `core` debe centralizar, como mínimo:
+* `config.py`: configuración por variables de entorno.
+* `database.py`: motor, sesiones y dependencias de SQLAlchemy.
+* `security.py`: hashing, creación y verificación de credenciales y tokens.
+* `dependencies.py`: usuario actual y dependencias de autorización.
+* `exceptions.py`: excepciones y manejadores globales.
+
+El módulo `financial_analysis` puede calcular resultados mediante consultas y agregaciones. No crees tablas o modelos artificiales para guardar resúmenes que se pueden calcular desde movimientos existentes, a menos que exista una justificación documentada de auditoría o rendimiento.
+
+3.2. Base de datos y migraciones
+
+* Mantén PostgreSQL 18 como motor objetivo y SQLAlchemy 2.0 como ORM.
+* Verifica que los modelos mapeen correctamente las nueve entidades definidas en el Prompt 01.
+* Usa Alembic para gestionar cambios de esquema y crear migraciones reproducibles.
+* No utilices `Base.metadata.create_all()` como estrategia de actualización del esquema en producción. Puede reservarse para pruebas aisladas o prototipos locales si está justificado.
+* No elimines ni recrees tablas con datos existentes sin una migración segura y una copia de respaldo.
+* Documenta cómo generar, revisar y ejecutar migraciones.
+* Las migraciones no deben introducir pérdida de datos ni cambios incompatibles inadvertidos.
+
+------------------------------------------------------------------------------
+4. FINALIZACIÓN DEL BACKEND Y REGLAS FINANCIERAS
+------------------------------------------------------------------------------
+
+Completa los módulos existentes y sus operaciones CRUD de acuerdo con el alcance de los Prompts 01 y 02.
+
+4.1. Autenticación y usuarios (`auth`, `users`)
+
+Implementar y verificar:
+* Registro de usuario.
+* Inicio de sesión.
+* Renovación de sesión o token, según el mecanismo adoptado.
+* Cierre de sesión e invalidación de refresh token cuando corresponda.
+* Consulta del usuario autenticado.
+* Consulta y actualización de perfil y preferencias, incluida la moneda principal.
+* Activación/desactivación de cuenta según permisos administrativos definidos.
+* Respuestas que nunca expongan `password_hash`, secretos, tokens internos ni credenciales.
+
+4.2. Ingresos (`incomes`)
+
+Implementar y verificar:
+* CRUD de fuentes de ingreso.
+* Registro, consulta y actualización de ingresos efectivamente recibidos.
+* Registro y consulta de deducciones asociadas a cada ingreso.
+* Cálculo del neto por movimiento: `monto_neto = monto_bruto - SUM(deducciones.monto)`.
+* Resumen mensual con total bruto, total de deducciones y total neto efectivamente recibido.
+* Filtros por mes, año, fuente y periodo.
+* Separación entre montos efectivamente recibidos y montos de referencia o proyecciones.
+* Validación de que la fuente y el ingreso pertenecen al usuario autenticado.
+* Prevención de deducciones duplicadas y de una suma de deducciones superior al monto bruto.
+
+No conviertas periodicidades en ingresos reales. Cuando se calcule una proyección, identifícala como estimación, explica el factor aplicado y conserva separada la cifra real.
+
+4.3. Gastos (`expenses`)
+
+Implementar y verificar:
+* Consulta de categorías globales y categorías privadas del usuario.
+* Administración de categorías personalizadas con control de propiedad.
+* CRUD de gastos.
+* Clasificación por naturaleza: `FIJO`, `VARIABLE` u `OCASIONAL`.
+* Clasificación por necesidad: `OBLIGATORIO`, `NECESARIO_VARIABLE` o `DISCRECIONAL`.
+* Clasificación potencial de gasto hormiga sin reemplazar automáticamente la decisión del usuario.
+* Estado de pago: `PAGADO`, `PENDIENTE` o `VENCIDO`.
+* Registro de periodicidad y recurrencia sin generar movimientos duplicados.
+* Filtros por periodo, categoría, naturaleza, clasificación y estado.
+* Separación entre dinero efectivamente desembolsado y compromisos pendientes.
+* Verificación de que categoría y gasto pertenecen al usuario autenticado, salvo categorías globales.
+
+La clasificación de necesidad no debe confundirse con la periodicidad o naturaleza del gasto. Un gasto fijo no es necesariamente obligatorio, y un gasto variable no es necesariamente prescindible.
+
+4.4. Deudas (`debts`)
+
+Implementar y verificar:
+* Registro, consulta, actualización y baja lógica de deudas.
+* Consulta de saldo inicial y saldo pendiente.
+* Registro de pagos asociados mediante movimientos de gasto, manteniendo la regla de integridad definida en el Prompt 01/02.
+* Actualización del saldo pendiente solo cuando el pago quede confirmado como pagado.
+* Separación entre abono a capital, intereses y otros cargos cuando aplique.
+* Prevención de pagos duplicados y de aplicación de pagos a una deuda de otro usuario.
+* Filtros por estado y vencimiento.
+
+Evita contabilizar dos veces un pago de deuda como gasto general y como pago independiente en un mismo resumen. Define una única regla de agregación y documéntala.
+
+4.5. Análisis financiero (`financial_analysis`)
+
+Implementar resúmenes que distingan explícitamente:
+* Ingreso neto real recibido dentro del periodo.
+* Total de gastos pagados dentro del periodo.
+* Total de compromisos pendientes y vencidos, presentados por separado.
+* Balance de efectivo del periodo.
+* Balance proyectado, si se calcula, identificado como estimación.
+* Capacidad de ahorro estimada con fórmula visible y supuestos documentados.
+* Desglose por categorías y fuentes de ingreso.
+* Comparación entre periodos, si los datos disponibles lo permiten.
+
+Como referencia, documenta y valida fórmulas equivalentes a:
+
+`ingreso_neto_periodo = SUM(montos_brutos_recibidos) - SUM(deducciones_asociadas)`
+
+`gastos_pagados_periodo = SUM(gastos cuyo estado_pago sea PAGADO y cuya fecha corresponda al periodo)`
+
+`balance_efectivo_periodo = ingreso_neto_periodo - gastos_pagados_periodo`
+
+`compromisos_pendientes = SUM(gastos pendientes o vencidos del periodo)`
+
+`balance_proyectado = ingreso_neto_periodo - gastos_pagados_periodo - compromisos_pendientes`
+
+Estas fórmulas son una referencia que debe contrastarse con el modelo real. Asegúrate de no restar dos veces pagos de deuda ni sumar obligaciones pendientes como si ya fueran desembolsos.
+
+La capacidad de ahorro es un indicador descriptivo calculado con datos registrados. Debe mostrar su fórmula, periodo y limitaciones. No garantizar que sea dinero disponible si hay obligaciones, ingresos irregulares o información incompleta.
+
+4.6. Detección de posibles gastos hormiga
+
+Implementar una detección explicable basada en patrones, por ejemplo:
+* Frecuencia de transacciones pequeñas dentro de un periodo.
+* Repetición por comercio o categoría.
+* Acumulado mensual o semanal.
+* Comparación con otros gastos del mismo usuario, cuando exista suficiente historial.
+* Umbrales configurables y documentados, sin asumir un límite universal.
+
+Cada sugerencia debe mostrar por qué fue generada: cantidad de movimientos, periodo observado, monto promedio y monto acumulado. El usuario debe poder revisar, aceptar, descartar o reclasificar una sugerencia si la funcionalidad lo permite.
+
+No clasifiques automáticamente un gasto como innecesario solo por su importe. No alteres movimientos originales ni categorías seleccionadas por el usuario sin autorización explícita.
+
+------------------------------------------------------------------------------
+5. PRECISIÓN MONETARIA, FECHAS E INTEGRIDAD DE LOS DATOS
+------------------------------------------------------------------------------
+
+* En PostgreSQL utiliza `NUMERIC`/`DECIMAL` para importes monetarios.
+* En Python utiliza `Decimal`; prohíbe `float` en operaciones de dinero.
+* Define precisión, escala y política de redondeo y aplícala consistentemente.
+* Serializa importes monetarios en JSON como cadenas decimales cuando sea necesario para preservar precisión. Documenta el contrato.
+* Usa una moneda principal por usuario mediante código ISO 4217. No sumes ni compares importes de monedas distintas.
+* No realices conversión de divisas si no existe un módulo explícito de tasas de cambio, fuente, fecha y reglas de conversión.
+* Define si cada fecha financiera es `DATE` o `TIMESTAMP` y aplica una zona horaria coherente.
+* Asegura que los límites mensuales no se desplacen por conversiones de zona horaria.
+* Utiliza transacciones para operaciones relacionadas: un fallo debe revertir el conjunto de cambios.
+* Añade índices para consultas frecuentes por usuario, fechas, estados, categorías y fuentes.
+* Conserva historial financiero relevante. Prefiere baja lógica o restricciones referenciales deliberadas frente a eliminaciones físicas accidentales.
+
+------------------------------------------------------------------------------
+6. HARDENING DE SEGURIDAD Y PRIVACIDAD
+------------------------------------------------------------------------------
+
+Endurece el backend sin romper la arquitectura existente.
+
+6.1. Gestión de secretos y configuración
+
+Centraliza la configuración con `pydantic-settings` o mecanismo equivalente. Crea `.env.example` sin credenciales reales.
+
+Variables de referencia:
+
+```env
+APP_NAME="TusFinanzas API"
+APP_ENV=development
+APP_DEBUG=false
+DATABASE_URL=postgresql://USUARIO:CONTRASENA@localhost:5432/tusfinanzas_db
+APP_JWT_SECRET=REEMPLAZAR_POR_SECRETO_ALEATORIO_LARGO
+APP_JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+REFRESH_TOKEN_EXPIRE_DAYS=7
+APP_COOKIE_SECURE=false
+APP_COOKIE_SAMESITE=lax
+APP_CORS_ORIGINS=["http://localhost:5173"]
+```
+
+Reglas:
+* Nunca hardcodear secretos, contraseñas ni URLs con credenciales.
+* No subir `.env` al control de versiones.
+* Validar que en producción existan secretos fuertes y configuración segura.
+* Separar perfiles `development`, `test` y `production`.
+* No mostrar trazas, consultas SQL, secretos ni información sensible en respuestas al cliente.
+
+6.2. Autenticación y sesiones
+
+* Mantener hashing seguro de contraseñas con una implementación vigente y compatible; si se conserva bcrypt, revisar sus parámetros y compatibilidad.
+* Aplicar políticas razonables de contraseña y respuestas de login que no permitan enumerar usuarios.
+* Usar access tokens de vida corta y refresh tokens con rotación e invalidación cuando corresponda.
+* Preferir cookies `HttpOnly`, `Secure` en producción y `SameSite` adecuado para el contexto de despliegue.
+* Si se usan cookies para autenticación, implementar protección CSRF apropiada.
+* No almacenar JWT ni refresh tokens en `localStorage` o `sessionStorage`.
+* Si el sistema utiliza un mecanismo Bearer sin cookies, documentar el riesgo, la estrategia de almacenamiento en memoria y renovación; nunca guardar tokens persistentes en almacenamiento accesible por JavaScript.
+
+6.3. Autorización y propiedad de la información
+
+* Aplicar mínimo privilegio y RBAC para los roles definidos en los Prompts 01/02.
+* Cada usuario solo puede consultar, modificar o eliminar sus fuentes, ingresos, deducciones, gastos, categorías privadas y deudas.
+* No confiar en `usuario_id` enviado en el cuerpo, query string o ruta. Obtener la identidad desde la sesión autenticada.
+* Validar propiedad en servicios y consultas SQL, no únicamente ocultar botones o rutas en frontend.
+* Las categorías globales podrán ser visibles según la regla funcional; las privadas solo para su propietario.
+* Evitar acceso horizontal cambiando UUIDs.
+* No permitir que un usuario modifique roles, permisos, estados administrativos o identificadores de propietario desde formularios ordinarios.
+
+6.4. OWASP y protección de datos
+
+Verifica, como mínimo:
+* A01 Broken Access Control: autorización y ownership en todos los endpoints privados.
+* A02 Cryptographic Failures: hash adecuado, secretos protegidos, HTTPS y cookies seguras.
+* A03 Injection: ORM y consultas parametrizadas; no concatenar SQL inseguro.
+* A04 Insecure Design: validación de reglas de negocio y límites de uso.
+* A05 Security Misconfiguration: CORS restrictivo, cabeceras y perfiles seguros.
+* A07 Identification and Authentication Failures: protección del login, expiración, renovación y cierre de sesión.
+* A09 Security Logging and Monitoring Failures: auditoría sin exponer datos sensibles.
+
+No registrar en logs contraseñas, tokens, claves, números de cuenta, ni detalles financieros que no sean necesarios. Restringe acceso a backups y datos de producción.
+
+------------------------------------------------------------------------------
+7. BASE FUNCIONAL DEL FRONTEND (OBLIGATORIO)
+------------------------------------------------------------------------------
+
+Debes crear o completar el frontend de TusFinanzas con React + TypeScript + Vite. El objetivo de esta fase es entregar la estructura funcional y visual inicial sobre la que puedan desarrollarse las funcionalidades completas en fases posteriores.
+
+No entregues solamente imágenes, wireframes, HTML estático ni componentes aislados. Debe existir una aplicación React ejecutable, con navegación real, rutas, componentes reutilizables, formularios y conexión preparada con el backend.
+
+7.1. Tecnologías y criterios
+
+* React con TypeScript y Vite.
+* React Router para navegación y rutas protegidas.
+* Axios como cliente HTTP centralizado, salvo que el proyecto ya utilice otro cliente de forma consistente.
+* TanStack Query puede utilizarse para cache, sincronización y estados de carga si aporta valor; evita duplicar innecesariamente el estado global.
+* Utiliza Context API para la sesión si el alcance lo requiere; no introduzcas un gestor de estado complejo sin justificación.
+* Utiliza CSS moderno, CSS Modules o la convención ya existente. Si el repositorio no tiene framework visual, no añadas Material UI, Bootstrap o Tailwind solo por comodidad. Mantén los estilos propios con variables CSS y componentes reutilizables.
+* Puedes utilizar una biblioteca de iconos mantenida, siempre que no incremente innecesariamente el peso del proyecto.
+* Usa tipado estricto de TypeScript. Evita `any`; si es inevitable, justifícalo y delimita su uso.
+* Mantén dependencias compatibles entre sí y registra las versiones en `package.json`.
+
+7.2. Estructura mínima del frontend
+
+Adapta esta estructura al proyecto real:
+
+```text
+frontend/src/
+|-- app/
+|   |-- App.tsx
+|   |-- providers.tsx
+|   `-- queryClient.ts
+|-- api/
+|   |-- httpClient.ts
+|   |-- apiErrors.ts
+|   `-- openapi/                 # Tipos generados desde el esquema OpenAPI, si se adopta
+|-- auth/
+|   |-- AuthContext.tsx
+|   |-- authService.ts
+|   |-- ProtectedRoute.tsx
+|   `-- PublicRoute.tsx
+|-- components/
+|   |-- ui/                      # Button, Input, Select, Card, Modal, Badge, etc.
+|   |-- feedback/                # Loading, ErrorState, EmptyState, ConfirmDialog
+|   `-- navigation/              # Sidebar, Header, Breadcrumbs, MobileNavigation
+|-- features/
+|   |-- dashboard/
+|   |-- incomes/
+|   |-- expenses/
+|   |-- debts/
+|   `-- financial-analysis/
+|-- hooks/
+|-- layouts/
+|   |-- AuthLayout.tsx
+|   `-- DashboardLayout.tsx
+|-- pages/
+|   |-- LoginPage.tsx
+|   |-- RegisterPage.tsx
+|   |-- DashboardPage.tsx
+|   |-- IncomesPage.tsx
+|   |-- ExpensesPage.tsx
+|   |-- DebtsPage.tsx
+|   |-- AnalysisPage.tsx
+|   `-- ProfilePage.tsx
+|-- routes/
+|   `-- AppRoutes.tsx
+|-- styles/
+|   |-- tokens.css
+|   |-- global.css
+|   `-- utilities.css
+|-- types/
+|-- utils/
+|   |-- currency.ts
+|   |-- dates.ts
+|   `-- validation.ts
+`-- main.tsx
+```
+
+No crees carpetas vacías sin propósito. Cada módulo debe contener código funcional o una explicación de su estado pendiente.
+
+7.3. Diseño visual y experiencia de usuario
+
+Construye una interfaz moderna, clara, profesional y orientada a finanzas personales. Debe transmitir orden, confianza y facilidad de uso, sin saturar al usuario con demasiados indicadores.
+
+Requisitos visuales:
+* Diseño responsive para escritorio, tablet y móvil.
+* Layout principal tipo dashboard con navegación lateral en escritorio y menú adaptable en móvil.
+* Encabezado con nombre de la sección, selector de periodo cuando aplique y acceso al perfil.
+* Jerarquía visual consistente para títulos, subtítulos, tarjetas, tablas y formularios.
+* Colores accesibles y contraste suficiente; no depender exclusivamente del color para comunicar estados.
+* Formularios con etiquetas visibles, ayudas, validaciones y mensajes de error comprensibles.
+* Estados visibles de carga, error, éxito y ausencia de datos.
+* Confirmación para operaciones destructivas o cambios relevantes.
+* Accesibilidad básica: navegación por teclado, foco visible, etiquetas asociadas, textos alternativos y semántica HTML.
+* Evitar mostrar cantidades financieras en más lugares de los necesarios; respetar privacidad al presentar información.
+
+Define tokens CSS reutilizables para colores, espacios, bordes, tipografía, sombras y puntos de quiebre. Mantén consistencia entre todas las páginas.
+
+7.4. Layout y navegación
+
+Implementa, como mínimo:
+
+A. `AuthLayout`
+* Contenedor visual para login y registro.
+* Mensajes de error generales y estados de envío.
+
+B. `DashboardLayout`
+* Sidebar con las secciones: Resumen, Ingresos, Gastos, Deudas y Análisis financiero.
+* Header con navegación móvil, periodo seleccionado si corresponde y menú de usuario.
+* Área principal de contenido.
+* Botón de cierre de sesión.
+* La navegación debe reflejar la sesión real y no mostrar accesos administrativos a usuarios sin permiso.
+
+C. Rutas:
+* `/login`
+* `/register`
+* `/dashboard`
+* `/incomes`
+* `/expenses`
+* `/debts`
+* `/analysis`
+* `/profile`
+
+Redirige usuarios no autenticados a `/login`. Redirige usuarios autenticados desde páginas públicas al dashboard cuando corresponda. La protección frontend mejora la experiencia, pero nunca sustituye la autorización del backend.
+
+7.5. Pantallas funcionales iniciales
+
+A. Login y registro
+* Formularios conectados a los endpoints reales de autenticación.
+* Validación de campos y mensajes de error claros.
+* Manejo correcto de carga y bloqueo del botón mientras se envía.
+* Persistencia de sesión según el mecanismo seguro acordado con el backend.
+
+B. Dashboard / Resumen
+Mostrar, cuando existan datos reales:
+* Ingreso neto recibido en el periodo.
+* Total de gastos pagados.
+* Compromisos pendientes/vencidos presentados por separado.
+* Balance de efectivo del periodo.
+* Capacidad de ahorro estimada, identificada como estimación.
+* Distribución de gastos por categoría.
+* Resumen de posibles gastos hormiga, con acceso al detalle.
+* Selector de mes y año.
+
+No inventes cifras para llenar tarjetas. Si el usuario no tiene datos, muestra un estado vacío con una acción clara para registrar su primer ingreso o gasto.
+
+C. Ingresos
+* Listado de fuentes de ingreso.
+* Listado de ingresos recibidos.
+* Formulario para crear/editar fuente e ingreso.
+* Registro y visualización de deducciones.
+* Resumen de bruto, deducciones y neto.
+* Filtros por periodo y fuente.
+
+D. Gastos
+* Listado con fecha, descripción, categoría, monto, periodicidad, clasificación y estado de pago.
+* Formulario de creación y edición.
+* Filtros por periodo, categoría, naturaleza, clasificación y estado.
+* Presentación diferenciada de gastos obligatorios, necesarios variables y discrecionales.
+* Presentación diferenciada de gastos pagados, pendientes y vencidos.
+* Campo para identificar y revisar posibles gastos hormiga, sin imponer la clasificación.
+
+E. Deudas
+* Listado de deudas con acreedor, tipo, saldo inicial, saldo pendiente, estado y vencimiento.
+* Formulario de registro/edición.
+* Visualización de pagos asociados cuando la API lo soporte.
+* Diferenciar el saldo pendiente del dinero efectivamente pagado.
+* No permitir ajustes de saldo arbitrarios desde el frontend si la API no contempla una operación segura para ello.
+
+F. Análisis financiero
+* Resumen del periodo seleccionado.
+* Comparación de ingresos netos, gastos pagados y compromisos pendientes.
+* Distribución por categorías.
+* Lista de posibles gastos hormiga con las razones de detección.
+* Explicación visible de las fórmulas y supuestos empleados.
+* Mensaje claro cuando el historial no sea suficiente para detectar patrones.
+
+G. Perfil y preferencias
+* Datos básicos del usuario.
+* Moneda principal.
+* Preferencias admitidas por la API.
+* Cierre de sesión.
+
+7.6. Componentes reutilizables mínimos
+
+Crea componentes compartidos según las necesidades reales:
+* `Button` con variantes y estados disabled/loading.
+* `Input`, `Select`, `Textarea` y controles de formulario accesibles.
+* `Card` para indicadores y agrupaciones de información.
+* `Badge` para estados de pago o clasificación.
+* `Modal` o `Dialog` para formularios y confirmaciones cuando sea adecuado.
+* `DataTable` o tabla adaptable para listados.
+* `LoadingState`, `ErrorState` y `EmptyState`.
+* `PageHeader` y componentes de navegación.
+* Componentes de importes monetarios y selección de periodo.
+
+No crees una biblioteca de componentes excesivamente abstracta. Prioriza componentes simples, reutilizables y coherentes.
+
+7.7. Manejo de importes, fechas y formularios en frontend
+
+* Los importes procedentes de la API deben tratarse como decimales, preferiblemente cadenas en JSON para preservar exactitud.
+* No utilices `parseFloat()` ni operaciones con `number` de JavaScript para cálculos monetarios.
+* Si el frontend necesita operar con decimales, utiliza una biblioteca decimal compatible, por ejemplo `decimal.js`, y limita las operaciones a presentación o interacción. Los cálculos oficiales y persistentes pertenecen al backend.
+* Centraliza el formato de moneda respetando el código ISO 4217 del usuario.
+* No supongas que todos los usuarios utilizan COP ni una cantidad fija de decimales.
+* Centraliza el tratamiento de fechas y periodos; evita errores al cambiar de mes o zona horaria.
+* La validación del frontend mejora la experiencia, pero el backend debe volver a validar todos los datos.
+* Distingue claramente campos obligatorios, opcionales y valores no disponibles.
+
+------------------------------------------------------------------------------
+8. INTEGRACIÓN FRONTEND-BACKEND Y CONTRATO API
+------------------------------------------------------------------------------
+
+La integración debe basarse en el contrato real de la API, no en endpoints imaginarios.
+
+8.1. Cliente HTTP centralizado
+
+Implementa un único cliente HTTP en `api/httpClient.ts` que centralice:
+* URL base tomada de `VITE_API_BASE_URL`.
+* Encabezados comunes.
+* Envío de cookies con `withCredentials` si se adopta autenticación mediante cookies.
+* Manejo consistente de respuestas y errores.
+* Tratamiento de `401`, `403`, `404`, `409`, `422` y errores de servidor.
+* Cancelación de solicitudes cuando el componente se desmonte o el usuario cambie de pantalla, cuando corresponda.
+* Evitar duplicar lógica de autenticación en cada servicio.
+
+Plantilla de `.env.example` del frontend:
+
+```env
+VITE_API_BASE_URL=http://localhost:8000/api/v1
+```
+
+No incluyas secretos en variables `VITE_*`: estas variables son visibles en el código entregado al navegador.
+
+8.2. Servicios por dominio
+
+Organiza funciones de consumo de API por dominio, por ejemplo:
+* `authService`: registro, login, refresh, logout y sesión actual.
+* `incomeService`: fuentes, ingresos, deducciones y resúmenes.
+* `expenseService`: categorías, gastos y filtros.
+* `debtService`: deudas y operaciones disponibles.
+* `financialAnalysisService`: resumen mensual y detección de patrones.
+
+Los servicios deben tipar sus peticiones y respuestas. Si el backend expone OpenAPI, considera generar tipos TypeScript desde ese esquema para disminuir discrepancias.
+
+8.3. Contrato de autenticación
+
+Define y documenta un único flujo. Si se utilizan cookies HttpOnly:
+* El navegador debe enviar credenciales con la configuración adecuada.
+* El frontend no debe intentar leer ni guardar el token HttpOnly.
+* La sesión debe verificarse mediante el endpoint de usuario actual.
+* Debe aplicarse el mecanismo CSRF definido por el backend.
+
+Si se utiliza otro flujo, documenta dónde reside el token, cómo se renueva y cómo se invalida. Nunca lo guardes en `localStorage` o `sessionStorage`.
+
+8.4. Endpoints y OpenAPI
+
+* Verifica los endpoints implementados en FastAPI.
+* Utiliza prefijo de versión consistente, por ejemplo `/api/v1`.
+* Mantén nombres, métodos, parámetros, códigos HTTP y esquemas de respuesta coherentes.
+* Publica OpenAPI y Swagger UI en desarrollo.
+* Documenta los endpoints usados por cada página.
+* Si falta un endpoint necesario para una pantalla, identifica la carencia y complétalo en backend antes de simular su respuesta.
+* No uses datos falsos en producción ni dejes mocks conectados por defecto.
+* Si se necesitan datos de demostración, sepáralos claramente para desarrollo y evita que se mezclen con información real.
+
+------------------------------------------------------------------------------
+9. CONFIGURACIÓN DE ENTORNO Y EJECUCIÓN
+------------------------------------------------------------------------------
+
+9.1. Backend
+
+* Mantén archivo `.env.example` en la carpeta backend.
+* Carga las variables de entorno desde una única configuración.
+* Incluye comandos para crear y activar `venv`.
+* Documenta instalación de dependencias y ejecución local de FastAPI.
+* Documenta creación de `tusfinanzas_db` y ejecución de migraciones Alembic.
+* Expón Swagger UI en `/docs` y el esquema OpenAPI.
+
+Comandos de referencia:
+
+```bash
+python -m venv venv
+# Windows PowerShell:
+.\venv\Scripts\Activate.ps1
+# Linux/macOS:
+source venv/bin/activate
+pip install -r requirements.txt
+alembic upgrade head
+uvicorn app.main:app --reload
+```
+
+Ajusta los comandos al punto de entrada y estructura reales.
+
+9.2. Frontend
+
+* Incluye `package.json` con scripts de desarrollo, compilación y vista previa.
+* Incluye `.env.example` con `VITE_API_BASE_URL`.
+* Documenta la versión de Node.js recomendada y compatible.
+* Incluye instrucciones de instalación y ejecución.
+
+Comandos orientativos:
+
+```bash
+npm install
+npm run dev
+npm run build
+npm run preview
+```
+
+No supongas que `npm run build` funciona: ejecútalo y reporta el resultado real.
+
+9.3. CORS y comunicación local
+
+* Configura CORS en backend para permitir el origen real de Vite, normalmente `http://localhost:5173` en desarrollo.
+* En producción, permite solo los dominios definidos.
+* Si se usan cookies, configura `allow_credentials` correctamente y no combines credenciales con un origen comodín `*`.
+* Documenta dominios, puertos y configuración necesaria para que frontend y backend se comuniquen.
+
+------------------------------------------------------------------------------
+10. DOCUMENTACIÓN TÉCNICA OBLIGATORIA
+------------------------------------------------------------------------------
+
+Actualiza o genera `READMEv2.md` o la documentación equivalente existente, evitando duplicar documentos con información contradictoria.
+
+Debe incluir:
+1. Descripción general de TusFinanzas y alcance funcional.
+2. Arquitectura de backend y frontend, con diagrama de capas.
+3. Estructura de carpetas completa.
+4. Modelo de datos y relaciones de las nueve entidades.
+5. Cálculos financieros: ingreso neto, gastos pagados, compromisos pendientes, balance y capacidad de ahorro.
+6. Reglas y limitaciones de la detección de posibles gastos hormiga.
+7. Seguridad, autenticación, sesiones, RBAC y ownership.
+8. Configuración de `.env.example` para backend y frontend.
+9. Instalación y ejecución del backend.
+10. Instalación y ejecución del frontend.
+11. Creación de base de datos y ejecución de migraciones.
+12. URL base de la API, Swagger UI y contrato OpenAPI.
+13. Endpoints implementados y páginas que los consumen.
+14. Guía de usuario inicial: registro, login, registro de ingresos, gastos, deudas y análisis mensual.
+15. Limitaciones conocidas, decisiones técnicas y funcionalidades pendientes.
+
+------------------------------------------------------------------------------
+11. VALIDACIÓN TÉCNICA Y PRUEBAS OBLIGATORIAS
+------------------------------------------------------------------------------
+
+Antes de entregar, ejecuta las verificaciones que permita el entorno y documenta sus resultados.
+
+11.1. Backend
+
+* Importación y arranque de la aplicación FastAPI.
+* Conexión a PostgreSQL.
+* Aplicación de migraciones desde una base de datos vacía, si el entorno lo permite.
+* Verificación de modelos, claves foráneas, restricciones e índices.
+* Verificación de endpoints y esquemas OpenAPI.
+* Pruebas de login, refresh y logout según el flujo adoptado.
+* Comprobación de que no se expone `password_hash` ni información sensible.
+* Pruebas de ownership entre dos usuarios distintos.
+* Comprobación de errores HTTP y mensajes seguros.
+* Comprobación de cálculos monetarios con ejemplos numéricos que incluyan decimales.
+* Comprobación de que ninguna operación monetaria use `float`.
+* Comprobación de que ingresos estimados y reales no se mezclen.
+* Comprobación de que gastos pagados y pendientes se presenten por separado.
+* Comprobación de que pagos de deudas no se contabilicen dos veces.
+
+11.2. Frontend
+
+* Instalación reproducible de dependencias.
+* Arranque de Vite.
+* Ejecución de `npm run build` y corrección de errores TypeScript.
+* Verificación de navegación entre todas las páginas base.
+* Verificación de rutas protegidas y públicas.
+* Verificación de login, logout y recuperación de sesión.
+* Verificación de estados de carga, error y ausencia de datos.
+* Verificación de formularios y mensajes de validación.
+* Verificación de solicitudes a los endpoints reales.
+* Comprobación responsive en tamaños de escritorio y móvil.
+* Comprobación de que no se almacenan tokens en `localStorage` o `sessionStorage`.
+* Comprobación de que no se exponen secretos en el bundle del frontend.
+* Comprobación de que importes y fechas se muestran con la moneda y periodo correctos.
+
+11.3. Criterios de aceptación funcional
+
+Considera la fase aceptada solo si:
+* Un usuario puede crear una cuenta e iniciar sesión.
+* Un usuario autenticado puede navegar por las secciones principales.
+* El frontend consulta al backend y muestra los datos del usuario autenticado.
+* Se puede registrar y consultar, como mínimo, información de ingresos y gastos mediante los endpoints disponibles.
+* La pantalla principal muestra estados vacíos correctos cuando no hay movimientos.
+* La información de un usuario no puede consultarse desde otra sesión.
+* Los cálculos presentados distinguen datos reales de estimaciones.
+* El proyecto frontend compila sin errores bloqueantes.
+* La documentación permite ejecutar ambos proyectos localmente.
+
+Si alguna condición no se puede verificar por falta de servicios, credenciales o infraestructura, indícalo expresamente y especifica cómo debe probarse.
+
+------------------------------------------------------------------------------
+12. ENTREGABLES ESPERADOS
+------------------------------------------------------------------------------
+
+Entrega los siguientes elementos dentro del repositorio:
+
+A. Backend
+1. Backend FastAPI completado y organizado por dominios.
+2. Modelos, esquemas, servicios y rutas coherentes con el modelo TusFinanzas.
+3. Migraciones Alembic revisadas.
+4. Configuración segura y `.env.example`.
+5. Endpoints documentados mediante OpenAPI/Swagger.
+
+B. Frontend
+6. Proyecto React + TypeScript + Vite ejecutable.
+7. Estructura base por dominios y componentes reutilizables.
+8. Sistema de navegación y layouts de autenticación y dashboard.
+9. Páginas iniciales de login, registro, resumen, ingresos, gastos, deudas, análisis y perfil.
+10. Cliente HTTP centralizado y servicios conectados a la API real.
+11. Tipos TypeScript de requests y responses, preferiblemente alineados con OpenAPI.
+12. Estados de carga, error, éxito y ausencia de datos.
+13. Estilos responsive y sistema básico de diseño.
+
+C. Documentación y verificación
+14. `READMEv2.md` actualizado con instrucciones para backend y frontend.
+15. `.env.example` para backend y frontend, sin secretos reales.
+16. Resumen de pruebas ejecutadas y sus resultados.
+17. Lista de limitaciones, decisiones técnicas y pendientes para la siguiente fase.
+18. Relación de archivos creados, modificados y eliminados, con una breve explicación.
+
+------------------------------------------------------------------------------
+13. FORMATO DE LA RESPUESTA FINAL
+------------------------------------------------------------------------------
+
+Al terminar el trabajo, presenta un informe organizado así:
+
+1. **Diagnóstico inicial:** estado del repositorio y problemas encontrados.
+2. **Cambios del backend:** módulos completados, reglas financieras y seguridad.
+3. **Base del frontend:** estructura, páginas, navegación, componentes y estilos creados.
+4. **Integración API:** endpoints conectados, contrato utilizado y aspectos pendientes.
+5. **Base de datos:** migraciones y cambios de esquema realizados.
+6. **Pruebas ejecutadas:** comandos ejecutados, resultado real y errores pendientes.
+7. **Archivos modificados:** rutas exactas y motivo del cambio.
+8. **Cómo ejecutar TusFinanzas:** instrucciones paso a paso para backend y frontend.
+9. **Pendientes:** limitaciones concretas y siguiente trabajo recomendado.
+
+No afirmes que una prueba pasó si no la ejecutaste. No declares que la aplicación está lista para producción si faltan controles, despliegue, pruebas o configuración. Diferencia claramente entre implementado, parcialmente implementado y pendiente.
+
+------------------------------------------------------------------------------
+14. RESULTADO ESPERADO
+------------------------------------------------------------------------------
+
+Una versión consolidada de TusFinanzas con:
+* Backend FastAPI robusto, modular y documentado.
+* Modelo de datos coherente con los Prompts 01 y 02.
+* Cálculos financieros verificables y precisos.
+* Seguridad y aislamiento de datos financieros por usuario.
+* API REST documentada y lista para consumo desde el frontend.
+* Base funcional de frontend en React + TypeScript + Vite, con autenticación, navegación, layout, páginas iniciales, componentes reutilizables y conexión real con la API.
+* Instrucciones reproducibles para ejecutar backend y frontend localmente.
+
+La finalidad de esta fase es dejar construidos los cimientos técnicos y visuales de ambos lados de la aplicación. Las funcionalidades avanzadas, ajustes visuales y pruebas exhaustivas podrán ampliarse en las siguientes fases, pero la base entregada debe compilar, navegar y comunicarse correctamente con los servicios que estén implementados.
+
+# FIN DEL PROMPT 03 - TUSFINANZAS
